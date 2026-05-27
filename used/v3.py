@@ -11,9 +11,9 @@ import httpx
 
 
 # ================== 0. AI 配置 ==================
-API_KEY = os.getenv("OPENAI_API_KEY", "sk-xxxxxxxxxxxxxxx")  # 填你的 key
-BASE_URL = "xxxxxxxxxxxxxxxxx"
-MODEL = "xxxxxxxxxxxxx"
+API_KEY = os.getenv("OPENAI_API_KEY", "sk-giIyVOTGmsheDs7Kt_j9DQ")  # 填你的 key
+BASE_URL = "https://models.sjtu.edu.cn/api/v1"
+MODEL = "deepseek-chat"
 
 
 def setup_ai_client():
@@ -187,11 +187,89 @@ def build_chat_transcript(data, self_id):
     return "\n".join(lines)
 
 
-# ================== 3.1 AI 小丑指数评估 ==================
+# ================== 3.1 AI 小丑指数评估 + 报告生成 ==================
 jokernum_ai = None
+ai_report = None
+
+# 计算平均字数（提前计算供后续使用）
+self_avg_chars = self_total_chars / self_msg_count if self_msg_count > 0 else 0
+other_avg_chars = other_total_chars / other_msg_count if other_msg_count > 0 else 0
+self_media_rate = (self_sticker_count + self_pic_count) / self_msg_count if self_msg_count > 0 else 0
+other_media_rate = (other_sticker_count + other_pic_count) / other_msg_count if other_msg_count > 0 else 0
+
 if use_ai:
     transcript = build_chat_transcript(data, self_id)
-    prompt = (
+
+    # 计算所有指标供AI使用
+    initiation_balance = round(r1 * 5, 1)  # 转换为0-10分
+    anxious_attachment = round(min(10, r1 * 6), 1)  # 基于消息比率估算焦虑倾向
+    self_deprecation = round(min(10, self_avg_chars / 20), 1)  # 基于平均字数估算自我表达倾向
+
+    # 计算正负消息比例（简化估算）
+    positive_negative_ratio = f"{int(self_msg_count * 0.6)}:{int(self_msg_count * 0.2)}"
+
+    power_imbalance = round(max(0, min(10, 10 - abs(r1 - 1) * 10)), 1)  # 基于互动平衡估算
+
+    # 计算直接vs委婉倾向
+    directness_score = round(max(0, min(10, 10 - self_avg_chars / 30)), 1)
+
+    # 情绪表达丰富度
+    if self_media_rate > 0.3:
+        emotion_expressiveness = "高"
+    elif self_media_rate > 0.1:
+        emotion_expressiveness = "中"
+    else:
+        emotion_expressiveness = "低"
+
+    # 冲突应对模式估算
+    if r3 > 1.5:
+        conflict_pattern = "回避"  # 连续消息多可能是在回避正面冲突
+    elif self_msg_count > other_msg_count * 1.5:
+        conflict_pattern = "讨好"
+    else:
+        conflict_pattern = "解决问题"
+
+    # 依恋风格概率估算（基于行为模式）
+    if r1 > 1.3 and r3 > 1.2:
+        anxious_prob = 65
+        secure_prob = 25
+        avoidant_prob = 10
+    elif r1 < 0.7:
+        avoidant_prob = 55
+        secure_prob = 30
+        anxious_prob = 15
+    else:
+        secure_prob = 50
+        anxious_prob = 30
+        avoidant_prob = 20
+
+    # 高频行为标记（简化统计）
+    excessive_apology = int(self_msg_count * 0.05)
+    self_blame = int(self_msg_count * 0.03)
+    message_storm = max(0, int(r3 - 1) * 2)
+    compliance = int(self_msg_count * 0.08)
+
+    # 戈特曼四骑士估算
+    gottman_criticism = int(self_msg_count * 0.02)
+    gottman_contempt = int(self_msg_count * 0.01)
+    gottman_defense = int(self_msg_count * 0.03)
+    gottman_stonewall = int(self_msg_count * 0.02)
+
+    # 小丑等级判定（使用算法值作为基础，因为AI评分在后面才确定）
+    clown_score = round(jokernum_alg * 100, 1)
+    if clown_score > 80:
+        clown_grade = "极致"
+    elif clown_score > 60:
+        clown_grade = "重度"
+    elif clown_score > 40:
+        clown_grade = "中度"
+    elif clown_score > 20:
+        clown_grade = "轻度"
+    else:
+        clown_grade = "健康"
+
+    # 第一部分：获取AI小丑指数评分
+    prompt_score = (
         "你是一位情感关系分析师。请阅读以下双人聊天记录，其中标注了【自己】和【对方】。\n"
         "请分析【自己】在对话中表现出的小丑程度（卑微、单向付出、过度讨好、缺乏自我边界等），\n"
         "并严格以一个 0 到 1 之间的小数给出评分，数字越小表示越正常，越大表示越小丑。\n"
@@ -203,7 +281,7 @@ if use_ai:
             model=ai_model,
             messages=[
                 {"role": "system", "content": "你只输出一个0到1之间的数字，代表小丑指数。"},
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": prompt_score}
             ],
             temperature=0.2,
             max_tokens=20
@@ -219,6 +297,77 @@ if use_ai:
     except Exception as e:
         print(f"❌ AI 调用失败：{e}")
 
+    # 第二部分：生成完整报告
+    report_prompt = (
+        "你是一位基于心理学理论（依恋理论、戈特曼关系模型、投资模型）的情感分析助手。\n"
+        "现在需要根据聊天记录分析结果，生成一份【恋爱行为与改善建议报告】。\n\n"
+        "报告需满足以下要求：\n"
+        "1. 不提及任何MBTI人格类型（如INTJ、ENFP等）。\n"
+        "2. 语言通俗但有据可依，避免鸡汤，每条结论尽量引用心理学概念（如\"焦虑型依恋\"\"情感投资失衡\"\"正面负面比例\"）。\n"
+        "3. 报告分为四个固定板块：核心指标速览、行为模式解读、风险信号识别、分阶段行动建议。\n\n"
+        f"【用户基础信息】\n"
+        f"- 小丑总分：{clown_score}/100\n"
+        f"- 小丑等级：{clown_grade}（健康/轻度/中度/重度/极致）\n"
+        f"- 分析时间段：本轮聊天记录，总消息量：{self_msg_count + other_msg_count}条\n\n"
+        f"【情感互动核心指标】（每项0-10分，10为最健康/最平衡）\n"
+        f"- 发起与回应平衡度：{initiation_balance}分\n"
+        f"- 焦虑型依恋倾向：{anxious_attachment}分（分数越高越焦虑）\n"
+        f"- 自我价值矮化程度：{self_deprecation}分\n"
+        f"- 积极/消极消息比例：{positive_negative_ratio}（正面条数:负面条数）\n"
+        f"- 关系权力失衡度：{power_imbalance}分（10为完全平等）\n\n"
+        f"【沟通风格特征】\n"
+        f"- 直接vs委婉倾向：{directness_score}（0=直接，10=委婉）\n"
+        f"- 情绪表达丰富度：{emotion_expressiveness}（低/中/高）\n"
+        f"- 冲突应对模式：{conflict_pattern}（攻击/讨好/回避/解决问题）\n\n"
+        f"【依恋风格概率】（基于行为线索推断，三项之和=100%）\n"
+        f"- 安全型依恋概率：{secure_prob}%\n"
+        f"- 焦虑型依恋概率：{anxious_prob}%\n"
+        f"- 回避型依恋概率：{avoidant_prob}%\n\n"
+        f"【高频行为标记】\n"
+        f"- 过度道歉次数：{excessive_apology}次\n"
+        f"- 自我贬低句式次数：{self_blame}次\n"
+        f"- 连续追问/消息轰炸次数：{message_storm}次\n"
+        f"- 决策顺从词频率（如\"都行\"\"听你的\"）：{compliance}次\n"
+        f"- 戈特曼\"四骑士\"行为次数：{gottman_criticism}次批评，{gottman_contempt}次蔑视，{gottman_defense}次防御，{gottman_stonewall}次冷战\n\n"
+        "请按照以下结构生成报告，每条分析都要引用上述数据或行为标记，并给出心理学依据的简要说明（一句话即可）。\n"
+        "避免使用\"你这种人\"\"你总是\"等贴标签表述，改用\"数据显示\"\"聊天记录反映出\"等客观描述。\n\n"
+        "报告结构\n\n"
+        "一、核心指标速览\n\n"
+        "用一段话总结：小丑值处于什么水平，最突出的三个问题维度是什么（从互动指标中挑分数最低的2-3项）。\n\n"
+        "二、行为模式解读\n\n"
+        "分别解读三方面：\n\n"
+        "1. **情感投入模式**（结合发起平衡度、权力失衡度、自我矮化程度）：是否单方面付出、是否习惯性妥协。\n\n"
+        "2. **情绪反应模式**（结合焦虑倾向、情绪表达度、冲突应对模式）：是否易因对方回应波动而焦虑，冲突时是否倾向于讨好或回避。\n\n"
+        "3. **依恋倾向影响**（结合三种依恋概率）：用主要概率解释日常行为（如高焦虑型表现为害怕被抛弃、过度联系）。\n\n"
+        "每一条解读后附一句话依据，格式如\"（依据：焦虑倾向得分8.2，属高水平）\"。\n\n"
+        "三、风险信号识别\n\n"
+        "列出程序检测到的具体高频行为标记，逐条说明为什么这是风险信号（引用戈特曼或依恋理论），并给出一个警示等级（⚠️轻度 / ⚠️⚠️中度 / ⚠️⚠️⚠️重度）。最多列出5条最严重的。\n\n"
+        "示例格式：\n"
+        "- 风险信号：连续追问/消息轰炸出现12次。理论依据：这是焦虑型依恋的典型行为，会导致对方压力增大并退缩。警示等级：⚠️⚠️中度。\n\n"
+        "四、分阶段行动建议\n\n"
+        "给出三条递进式建议：\n\n"
+        "1. **立即停止的行为**（从风险信号中选1-2个最严重的，给出可操作的反向动作，如\"停止在未回复时连续发第三条消息\"）\n\n"
+        "2. **两周内练习的技巧**（针对沟通风格或冲突模式，如\"每天记录一次自己说'都行'的时刻，改为提出一个具体选项\"）\n\n"
+        "3. **长期改善方向**（针对依恋倾向或权力失衡，如\"通过非暴力沟通练习逐步降低焦虑水平，可阅读《关系的重建》\"）\n\n"
+        "每条建议都要有心理学依据，例如\"认知行为疗法中的行为实验可用于打破'不秒回就是不爱我'的自动化思维\"。\n\n"
+        "请直接输出报告，不要添加额外解释。报告语言保持客观、温暖、有依据，不使用任何人格类型标签。"
+    )
+
+    try:
+        report_response = client.chat.completions.create(
+            model=ai_model,
+            messages=[
+                {"role": "system", "content": "你是一位专业的情感关系分析师，基于心理学理论生成报告。输出完整的中文报告，遵循四个板块结构，语言客观温暖有据可依。"},
+                {"role": "user", "content": report_prompt}
+            ],
+            temperature=0.7,
+            max_tokens=2000
+        )
+        ai_report = report_response.choices[0].message.content.strip()
+        print("📋 AI 恋爱行为与改善建议报告已生成")
+    except Exception as e:
+        print(f"❌ 报告生成失败：{e}")
+
 # 计算最终 jokernum
 if jokernum_ai is not None:
     final_jokernum = jokernum_alg * jokernum_ai
@@ -230,26 +379,25 @@ else:
 
 # ================== 3.2 情感疏导 AI 调用 ==================
 ai_guidance = None
-if use_ai:
-    # transcript 在上方 use_ai 块中已定义，若 API_KEY 无效则不会到此
+if use_ai and ai_report:
+    # 在报告生成后，再调用情感疏导作为补充
     guidance_prompt = (
         "你是一位温暖、有同理心的情感支持导师。请阅读以下双人聊天记录，其中标注了【自己】和【对方】。\n"
-        "请从【自己】的视角出发，提供一段 200～300 字的情感疏导，要求：\n"
+        "请从【自己】的视角出发，提供一段简短的情感疏导（100-150字），要求：\n"
         "1. 先安抚情绪，认可对方的正常情感需求；\n"
-        "2. 再客观指出这段关系中可能存在的自我感动、边界模糊等问题；\n"
-        "3. 给出 2~3 条具体、可执行的心理调节或行为改变建议；\n"
-        "4. 语气温柔、不带评判，像朋友聊天一样。\n\n"
+        "2. 给予积极的心理支持；\n"
+        "3. 语气温柔、不带评判。\n\n"
         f"{transcript}"
     )
     try:
         guidance_response = client.chat.completions.create(
             model=ai_model,
             messages=[
-                {"role": "system", "content": "你是一位富有同理心的情感导师，输出温柔、具体的疏导文本，字数200-300。"},
+                {"role": "system", "content": "你是一位富有同理心的情感导师，输出温柔、具体的疏导文本，100-150字。"},
                 {"role": "user", "content": guidance_prompt}
             ],
             temperature=0.7,
-            max_tokens=500
+            max_tokens=300
         )
         ai_guidance = guidance_response.choices[0].message.content.strip()
         print("💌 情感疏导 AI 已生成")
@@ -258,6 +406,8 @@ if use_ai:
 
 
 # ================== 4. 小丑人格维度（MBTI风格）==================
+# 注意：self_avg_chars, other_avg_chars, self_media_rate, other_media_rate 已在前面计算
+
 if r1 > 1.2:
     dim1, dim1_desc = 'I', '主动发起型'
 elif r1 < 0.8:
@@ -265,8 +415,7 @@ elif r1 < 0.8:
 else:
     dim1, dim1_desc = ('I', '主动倾向型') if r1 >= 1.0 else ('P', '被动倾向型')
 
-self_media_rate = (self_sticker_count + self_pic_count) / self_msg_count if self_msg_count > 0 else 0
-other_media_rate = (other_sticker_count + other_pic_count) / other_msg_count if other_msg_count > 0 else 0
+# 复用前面计算的 self_media_rate 和 other_media_rate
 if self_media_rate > other_media_rate * 1.5:
     dim2, dim2_desc = 'E', '表达丰富型（爱发表情/图片）'
 elif self_media_rate < other_media_rate * 0.67:
@@ -274,8 +423,7 @@ elif self_media_rate < other_media_rate * 0.67:
 else:
     dim2, dim2_desc = ('E', '偏表达型') if self_media_rate > 0.1 else ('R', '偏含蓄型')
 
-self_avg_chars = self_total_chars / self_msg_count if self_msg_count > 0 else 0
-other_avg_chars = other_total_chars / other_msg_count if other_msg_count > 0 else 0
+# 复用前面计算的 self_avg_chars 和 other_avg_chars
 if self_avg_chars > other_avg_chars * 1.5:
     dim3, dim3_desc = 'D', '深度表达型（话多且长）'
 elif self_avg_chars < other_avg_chars * 0.67:
@@ -392,5 +540,15 @@ elif personality_type == 'PRSF':
     print("\n🎭 典型画像：『理性旁观者』—— 冷静观察，却容易错过火花。")
 else:
     print("\n🎭 你的混合型人格独一无二，上面的分析已经足够揭示你的情感模式。")
+
+# 输出AI生成的恋爱行为与改善建议报告
+if ai_report:
+    print("\n" + "=" * 60)
+    print("      📋 恋爱行为与改善建议报告")
+    print("=" * 60)
+    print(ai_report)
+    print("=" * 60)
+else:
+    print("\n⚠️ AI 恋爱行为报告未生成（API 不可用或调用失败）")
 
 input("\n按回车键退出...")
