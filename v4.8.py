@@ -12,6 +12,7 @@ import subprocess
 import importlib
 import os
 import math
+import serial
 
 # ================== 自动化依赖安装 ==================
 REQUIRED_PACKAGES = {
@@ -21,7 +22,8 @@ REQUIRED_PACKAGES = {
     'openai': 'openai',
     'httpx': 'httpx',
     'pygame': 'pygame',
-    'PIL': 'Pillow' 
+    'PIL': 'Pillow',
+    'serial': 'pyserial'
 }
 
 def auto_install_packages():
@@ -82,6 +84,21 @@ CN_FONT = _detect_cn_font()
 API_KEY = os.getenv("", "") # 请替换为你的真实 Key
 BASE_URL = "https://api.deepseek.com"
 MODEL = "deepseek-chat"
+
+# ================== 串口配置（连接 Arduino UNO） ==================
+SERIAL_PORT = "COM3"
+SERIAL_BAUD = 9600
+
+def send_jokernum_to_arduino(jokernum):
+    """将 jokernum (0~100) 通过串口发送给 Arduino UNO"""
+    try:
+        ser = serial.Serial(SERIAL_PORT, SERIAL_BAUD, timeout=1)
+        # 将浮点数转为整数发送，Arduino 端使用 Serial.parseInt() 接收
+        ser.write(f"{int(jokernum)}\n".encode('utf-8'))
+        ser.close()
+        print(f"[串口] 已发送 jokernum={int(jokernum)} → {SERIAL_PORT}")
+    except Exception as e:
+        print(f"[串口] 发送失败（Arduino 可能未连接）: {e}")
 
 # ================== 小丑类型定义 ==================
 JOKER_TYPES = {
@@ -672,6 +689,9 @@ class JokerDetectorGUI:
         def run():
             try:
                 self.result = self.analyzer.full_analysis(self.selected_file, self.speaker_var.get())
+                # 将 jokernum 通过串口发送给 Arduino UNO
+                jokernum = self.result['stats']['jokernum_alg']
+                send_jokernum_to_arduino(jokernum)
                 self.root.after(0, self._display_result)
             except Exception as e:
                 self.root.after(0, lambda: self._on_error(str(e)))
