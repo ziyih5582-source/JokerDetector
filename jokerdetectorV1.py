@@ -46,8 +46,8 @@ CN_FONT = _detect_cn_font()
 print(f"[字体] 检测到中文字体：{CN_FONT}")
 
 # ================== AI 配置 ==================
-API_KEY = os.getenv("OPENAI_API_KEY", "sk-xxxxxxxxxxxxxxxxxxxxx")
-BASE_URL = "https://models.sjtu.edu.cn/api/v1"
+API_KEY = os.getenv("", "")
+BASE_URL = "https://api.deepseek.com"
 MODEL = "deepseek-chat"
 
 # ================== 小丑类型定义 ==================

@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-本次更新总结 (v4.8 版)
-算法内核重构 (零和博弈)：彻底摒弃了之前的线性平均逻辑，采用了基于“权力的不对等性”的微分数学模型。实现了互斥判定，通过对数平滑（Logarithmic Smoothing）和 Z-Score 稳健标准化，确保了只要一个人显露“小丑”特征，另一个人必然表现出对应的强势特征。 
- 体验与 UI 优化：
- 滚动控制：为右侧结果栏增加了 Canvas 容器，解决了长文本被遮挡的问题，完美支持鼠标滚轮滚动。
- 音频控制：将单一的停止功能改为“暂停/继续”切换，避免了误触后的音乐中断。
- 兼容性：加入了正则化数据解析器，能够处理“交替行”、“单列冒号”和“分列”等多种乱序聊天导出格式。
-自动化配置：加入了自动依赖检测与安装逻辑，大幅降低了非开发者使用该脚本的门槛。
+本次更新总结 (v4.8 版 + 严苛判定版)
+算法内核重构 (零和博弈)：彻底摒弃了之前的线性平均逻辑，采用了基于“权力的不对等性”的微分数学模型。
+高敏动态平衡：Sigmoid 函数偏置项调整为 0.05，斜率提升至 5.0。对微小的权力倾斜（如追求期）极其敏感，分数拉升极快。
+严苛决策树：≥60分算法直接强杀确诊；45-60分交由AI死磕细节；<45分才算真正势均力敌。
+AI 标尺收紧：明确规定“害怕冷场、过度解释、单向输出”即为小丑，打破“对方有回复就不算”的假阳性豁免。
 """
 
 import sys
@@ -81,7 +79,7 @@ def _detect_cn_font():
 CN_FONT = _detect_cn_font()
 
 # ================== AI 配置 ==================
-API_KEY = os.getenv("OPENAI_API_KEY", "sk-xxxxxxxxxxxxxxxxxxx") # 请替换为你的真实 Key
+API_KEY = os.getenv("", "") # 请替换为你的真实 Key
 BASE_URL = "https://api.deepseek.com"
 MODEL = "deepseek-chat"
 
@@ -121,7 +119,6 @@ JOKER_TYPES = {
     }
 }
 
-# 升级版非小丑文案
 NOT_JOKER_DESC = "🎉 恭喜！你击败了全国 99% 的纯爱战神！\n在你们的聊天中，你保持了极高的人格独立与边界感，没有出现明显的妥协与卑微。但记住，爱情是一场势均力敌的博弈，继续保持你的清醒，享受关系本身吧！"
 
 # ================== 核心分析引擎 ==================
@@ -141,7 +138,6 @@ class JokerAnalyzer:
             self.client = None
 
     def parse_chat(self, file_path):
-        """通吃任何排版格式的解析引擎"""
         try:
             if file_path.lower().endswith('.xls'):
                 df = pd.read_excel(file_path, header=None, engine='xlrd')
@@ -258,7 +254,6 @@ class JokerAnalyzer:
         stats['self_avg_chars'] = stats['self_total_chars'] / stats['self_msg_count'] if stats['self_msg_count'] > 0 else 0
         stats['other_avg_chars'] = stats['other_total_chars'] / stats['other_msg_count'] if stats['other_msg_count'] > 0 else 0
 
-        # 全新零和博弈算法核心
         DA = sum(1 for i in range(1, len(data)) if data[i][0] == self_id and data[i-1][0] == self_id)
         DB = sum(1 for i in range(1, len(data)) if data[i][0] == other_id and data[i-1][0] == other_id)
         Z_SSDT = (DA - DB) / (DA + DB + 1e-6)
@@ -299,9 +294,12 @@ class JokerAnalyzer:
         Conv_BA = conv_ba / (base_ba + 1e-6)
         Z_CONV = Conv_AB - Conv_BA
 
+        # ⚠️绝对严苛优化：左移偏置到 0.05，增大斜率到 5.0。只要有轻微势能差，分数立刻拉升
         Z_Total = 0.25 * Z_SSDT + 0.2 * Z_PFI + 0.2 * Z_PLD + 0.15 * Z_EPEG + 0.2 * Z_CONV
-        score = 100 / (1 + math.exp(-3.0 * Z_Total))
-        if stats['has_voice_or_call']: score *= 0.85
+        score = 100 / (1 + math.exp(-5.0 * (Z_Total - 0.05)))
+        
+        # 语音通话的扣分力度减弱，避免追人的时候打了几个电话就被洗白
+        if stats['has_voice_or_call']: score *= 0.95
 
         stats['jokernum_alg'] = score
         stats['z_metrics'] = {'SSDT': Z_SSDT, 'PFI': Z_PFI, 'PLD': Z_PLD, 'EPEG': Z_EPEG, 'CONV': Z_CONV}
@@ -310,10 +308,8 @@ class JokerAnalyzer:
     def classify_joker_type_algorithmic(self, stats, data, self_id):
         score = stats['jokernum_alg']
         
-        # ⚠️核心修改：极度严苛的阈值。只要大于 15 分，统统归入小丑分类！
-        is_joker = score > 15.0
-        if not is_joker: 
-            return False, None, score
+        # 这个只是基础门槛，用于生成类型。真实的是否小丑取决于 full_analysis 的交叉验证
+        is_joker = score > 45.0
 
         z_metrics = stats['z_metrics']
         highest_metric = max(z_metrics, key=z_metrics.get)
@@ -323,17 +319,23 @@ class JokerAnalyzer:
         elif highest_metric == 'PLD': joker_type = "弄臣型"      
         else: joker_type = "殉道型"                              
 
-        return True, joker_type, score
+        return is_joker, joker_type, score
 
     def classify_joker_type_ai(self, data, self_id, stats):
         if self.client is None: return None, None, None
         transcript_lines = [f"{'【自己】' if speaker == self_id else '【对方】'}{speaker}: {msg}" for speaker, msg in data]
         transcript = "\n".join(transcript_lines[-300:]) 
 
-        # AI 同样执行低阈值捕获策略
-        prompt = f"""你是一位情感分析师。阅读聊天记录，只要【自己】在聊天中表现出任何一丝讨好、卑微、过度付出或单向热情，就必须将其判定为小丑。
-如果绝对没有，输出：NOT_JOKER
-如果有，输出：类型名称（殉道型/镜像型/弄臣型/幻恋型） 小丑指数（16-100整数）
+        # ⚠️严苛标尺：不再因为“对方有回复”就放过，严查害怕冷场和情绪单向输出
+        prompt = f"""你是一位极其敏锐的情感博弈分析师。阅读聊天记录，判断【自己】在关系中是否处于低位（小丑）。
+
+【严苛判定标尺】：
+1. 只要【自己】表现出以下任何一点：害怕冷场而连续找话题、过度解释自己的行为、字数和热情明显多于对方、单向提供情绪价值（即使对方有回复）。只要满足其一，【必须】判定为小丑。
+2. 只有当双方完全势均力敌，互相推拉，不惧怕冷场，谁也不怕失去谁时，才能输出：NOT_JOKER
+
+如果属于小丑行为，输出：类型名称（殉道型/镜像型/弄臣型/幻恋型） 小丑指数（60-100整数）
+如果不属于，输出：NOT_JOKER
+
 聊天记录：\n{transcript}"""
 
         try:
@@ -347,27 +349,55 @@ class JokerAnalyzer:
             for t in JOKER_TYPES:
                 if t in res:
                     m = re.search(r'(\d+)', res)
-                    return True, t, int(m.group(1)) if m else 50
-            return True, "殉道型", 50
+                    return True, t, int(m.group(1)) if m else 65
+            return True, "殉道型", 65
         except:
             return None, None, None
 
     def ai_guidance(self, data, self_id, is_joker, joker_type):
-        """⚠️核心修改：增加对非小丑的AI强制点评"""
         if self.client is None: return None
+        
         transcript_lines = [f"{'【自己】' if speaker == self_id else '【对方】'}{speaker}: {msg}" for speaker, msg in data]
-        transcript = "\n".join(transcript_lines[-300:])
+        transcript = "\n".join(transcript_lines[-500:])
         
         if is_joker:
-            prompt = f"""作为情感导师，用户在聊天中被诊断为「{joker_type}」。请阅读聊天记录，写150-200字温柔且一针见血的疏导：安抚情绪、点出ta在记录中的具体讨好行为、给出一口建议。\n记录：\n{transcript}"""
+            type_info = JOKER_TYPES.get(joker_type, {})
+            type_desc = type_info.get('desc', '')
+            
+            prompt = f"""你是一位理性客观的情感支持导师。用户被分析为「{joker_type}」小丑（{type_desc}）。
+
+请阅读聊天记录，从【自己】的视角出发，写一段情感疏导（2000字左右）：
+1. 先安抚情绪
+2. 结合他的具体聊天内容具体分析，点出问题。结合著名的人际交往和爱情理论（如依恋理论、亲密关系的五大需求等）进行分析，帮助他理解自己的行为模式和背后的心理机制
+3. 针对具体的聊天内容给出具体的建议
+4. 语气温柔
+5. 如果你没有拿到具体的聊天记录就老实说没拿到聊天记录，方便开发者调试
+
+聊天记录：
+{transcript}"""
+
         else:
-            prompt = f"""作为情感导师，用户在聊天中表现出了极高的人格独立和边界感，属于势均力敌的「清醒玩家」。请阅读聊天记录，写150-200字的话：夸奖ta在记录中不卑不亢的具体表现，并给出一条如何继续保持这种健康博弈关系的进阶建议。\n记录：\n{transcript}"""
+            prompt = f"""你是一位理性客观的情感支持导师。用户在聊天中表现出了极高的人格独立和边界感，没有陷入卑微讨好的境地，属于势均力敌的「清醒玩家」。
+
+请阅读聊天记录，写一段情感复盘与鼓励（1000字左右）：
+1. 肯定并夸奖ta在聊天中不卑不亢的具体表现（请引用聊天记录中的具体细节）。
+2. 结合著名的人际交往和爱情理论，分析目前这段关系中的权力流动状态，告诉ta为什么这种保持自我的方式是健康的。
+3. 给出一条进阶建议，指导ta如何继续保持这种健康博弈关系。
+4. 语气温柔、真诚且带有欣赏。
+5. 如果你没有拿到具体的聊天记录就老实说没拿到聊天记录，方便开发者调试。
+
+聊天记录：
+{transcript}"""
 
         try:
             response = self.client.chat.completions.create(
                 model=self.ai_model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.7, max_tokens=400
+                messages=[
+                    {"role": "system", "content": "你是一位富有同理心且专业的情感导师。你的回答需要娓娓道来，充满温度，像一封写给朋友的信。"},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7, 
+                max_tokens=2000
             )
             return response.choices[0].message.content.strip()
         except:
@@ -381,17 +411,34 @@ class JokerAnalyzer:
 
         self_id, other_id = speakers[self_index], speakers[1 - self_index]
         stats = self.compute_statistics(data, self_id, other_id)
+        
         is_joker_alg, joker_type_alg, _ = self.classify_joker_type_algorithmic(stats, data, self_id)
         is_joker_ai, joker_type_ai, ai_score = self.classify_joker_type_ai(data, self_id, stats)
 
-        is_joker = is_joker_alg
         ai_available = is_joker_ai is not None
+        alg_score = stats['jokernum_alg']
+        
+        # ⚠️核弹级收严：降低确诊门槛
+        if ai_available:
+            if alg_score >= 60.0:
+                # 算出来超过 60 分（追求期），立刻盖章确诊，不听 AI 辩解
+                is_joker = True
+            elif alg_score >= 45.0:
+                # 45-60分的微小倾斜，让 AI 决定
+                is_joker = is_joker_ai
+            else:
+                is_joker = False
+        else:
+            # 断网状态下，算法过 50 即确诊
+            is_joker = alg_score > 50.0
 
-        if ai_available and is_joker_ai and joker_type_ai: joker_type = joker_type_ai
-        elif is_joker: joker_type = joker_type_alg
-        else: joker_type, ai_score = None, None
+        if is_joker and ai_available and joker_type_ai: 
+            joker_type = joker_type_ai
+        elif is_joker: 
+            joker_type = joker_type_alg
+        else: 
+            joker_type, ai_score = None, None
 
-        # 强制调用AI生成疏导文本，不管是不是小丑
         guidance = self.ai_guidance(data, self_id, is_joker, joker_type) if self.client else None
 
         return {
@@ -568,6 +615,8 @@ class JokerDetectorGUI:
         try:
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(f"诊断对象：{r['self_id']} \n诊断得分：{r['stats']['jokernum_alg']:.1f}/100\n类型：{r['joker_type'] if r['is_joker'] else '清醒非小丑'}")
+                if r.get('guidance'):
+                    f.write(f"\n\n========================\n\n{r['guidance']}")
             messagebox.showinfo("导出成功", f"报告已保存至：\n{file_path}")
         except Exception as e:
             messagebox.showerror("导出失败", f"保存错误：\n{e}")
@@ -684,7 +733,6 @@ class JokerDetectorGUI:
             tk.Label(desc_frame, text=type_info['desc'], bg=self.colors['bg_card'], font=(CN_FONT, 12), wraplength=420, justify='left').pack(anchor='w', pady=(6, 10))
             tk.Label(desc_frame, text=f"💡 {type_info['suggestion']}", bg=self.colors['bg_card'], fg=self.colors['success'], font=(CN_FONT, 11, 'italic'), wraplength=420, justify='left').pack(anchor='w')
         else:
-            # 专属的非小丑傲娇文案展示
             ttk.Label(self.result_content, text=NOT_JOKER_DESC, style='Card.TLabel', font=(CN_FONT, 12), wraplength=550).pack(anchor='w', padx=15, pady=15)
 
         ttk.Separator(self.result_content, orient='horizontal').pack(fill='x', padx=15, pady=8)
@@ -702,13 +750,11 @@ class JokerDetectorGUI:
             ttk.Label(stat_grid, text=left_stats[i], style='Stat.TLabel', foreground=self.colors['text_secondary']).grid(row=i, column=0, sticky='w', pady=2, padx=(0, 30))
             ttk.Label(stat_grid, text=right_stats[i], style='Stat.TLabel', foreground=self.colors['text_secondary']).grid(row=i, column=1, sticky='w', pady=2)
 
-        # ⚠️ 核心修改：所有人强制展示AI疏导卡片！
         if r.get('guidance'):
             ttk.Separator(self.result_content, orient='horizontal').pack(fill='x', padx=15, pady=8)
             g_frame = ttk.Frame(self.result_content, style='Card.TFrame')
             g_frame.pack(fill='x', padx=15, pady=5)
-            # 标题动态改变
-            ai_title = "💌 AI 情感专属疏导" if is_joker else "👑 AI 高手专属点评"
+            ai_title = "💌 AI 深度情感诊断报告" if is_joker else "👑 AI 高阶博弈复盘报告"
             ttk.Label(g_frame, text=ai_title, style='Accent.TLabel').pack(anchor='w', pady=(0, 8))
             ttk.Label(g_frame, text=r['guidance'], style='TypeDesc.TLabel', wraplength=550).pack(anchor='w')
 
