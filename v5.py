@@ -57,7 +57,7 @@ def _detect_cn_font():
 CN_FONT = _detect_cn_font()
 
 # ================== AI 配置 ==================
-API_KEY = os.getenv("loneranger1118", "sk-bd9dc29e52f94d76b42990a0592d6c37") # 请替换为你的真实 Key
+API_KEY = os.getenv("", "") # 请替换为你的真实 Key
 BASE_URL = "https://api.deepseek.com"
 MODEL = "deepseek-chat"
 
