@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🃏 Joker Detector Pro - 小丑监测器</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+<body>
+    <!-- ========== 粒子背景 ========== -->
+    <canvas id="particles"></canvas>
+
+    <!-- ========== 加载遮罩 ========== -->
+    <div id="loading-overlay" class="hidden">
+        <div class="loading-content">
+            <div class="joker-circle">
+                <span class="joker-emoji">🃏</span>
+            </div>
+            <div class="loading-bar">
+                <div class="loading-fill"></div>
+            </div>
+            <p id="loading-text" class="loading-text">正在深度分析你的聊天记录...</p>
+        </div>
+    </div>
+
+    <!-- ========== 主容器 ========== -->
+    <div id="app" class="app-container">
+
+        <!-- ===== 第1屏：首页 Hero ===== -->
+        <section id="hero-section" class="hero-section">
+            <div class="hero-glow"></div>
+            <div class="hero-content">
+                <div class="logo-area">
+                    <span class="logo-icon">🃏</span>
+                    <h1 class="hero-title">
+                        <span class="gradient-text">Joker Detector</span>
+                        <span class="sub-title">小丑监测器 Pro</span>
+                    </h1>
+                </div>
+                <p class="hero-desc">用算法 + AI 双维度分析你的聊天模式，量化你的"小丑指数"</p>
+
+                <!-- AI 配置面板 -->
+                <div class="ai-config-section">
+                    <div class="ai-config-header" id="ai-config-toggle">
+                        <span class="ai-status-dot" id="ai-status-dot"></span>
+                        <span>🤖 AI 增强分析</span>
+                        <span class="ai-expand-icon">▾</span>
+                    </div>
+                    <div class="ai-config-body hidden" id="ai-config-body">
+                        <div class="ai-config-row">
+                            <label class="ai-label">API Key</label>
+                            <input type="password" id="ai-api-key" class="ai-input" placeholder="sk-xxxxxxxxxxxxxxxx"
+                                   autocomplete="off">
+                        </div>
+                        <div class="ai-config-row">
+                            <label class="ai-label">模型</label>
+                            <select id="ai-model" class="ai-input">
+                                <option value="deepseek-chat">deepseek-chat</option>
+                                <option value="deepseek-reasoner">deepseek-reasoner</option>
+                            </select>
+                        </div>
+                        <div class="ai-config-row">
+                            <label class="ai-label">API 地址</label>
+                            <input type="text" id="ai-base-url" class="ai-input"
+                                   value="https://api.deepseek.com" placeholder="https://api.deepseek.com">
+                        </div>
+                        <button id="ai-save-btn" class="btn btn-sm btn-primary">✅ 连接并启用 AI</button>
+                        <span id="ai-config-msg" class="ai-config-msg"></span>
+                    </div>
+                </div>
+
+                <!-- Demo 选择卡片 -->
+                <div class="demo-section">
+                    <h3 class="section-label">⚡ 一键演示（无需上传文件）</h3>
+                    <div id="demo-cards" class="demo-cards">
+                        <!-- JS 动态填充 -->
+                    </div>
+                </div>
+
+                <!-- 文件上传区 -->
+                <div class="upload-section">
+                    <h3 class="section-label">📂 或上传微信聊天记录 Excel</h3>
+                    <div id="upload-zone" class="upload-zone">
+                        <div class="upload-icon">📁</div>
+                        <p class="upload-hint">拖拽 .xlsx / .xls 文件到此处<br>或点击选择文件</p>
+                        <input type="file" id="file-input" accept=".xlsx,.xls" hidden>
+                        <div class="speaker-select hidden" id="speaker-select">
+                            <span>👤 我是：</span>
+                            <label class="radio-label">
+                                <input type="radio" name="self_index" value="0" checked>
+                                <span id="speaker-0">用户 0</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="self_index" value="1">
+                                <span id="speaker-1">用户 1</span>
+                            </label>
+                            <button id="analyze-btn" class="btn btn-primary">🔍 开始分析</button>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="disclaimer">⚠️ 本项目仅供课程学习和娱乐目的，请勿用于实际情感决策</p>
+            </div>
+        </section>
+
+        <!-- ===== 第2屏：分析结果仪表盘 ===== -->
+        <section id="result-section" class="result-section hidden">
+            <div id="report-card" class="report-card">
+
+                <!-- 头部：判定结果 -->
+                <div id="verdict-header" class="verdict-header">
+                    <div class="verdict-badge" id="verdict-badge">
+                        <span id="verdict-icon"></span>
+                        <span id="verdict-label"></span>
+                    </div>
+                    <div class="score-display">
+                        <span class="score-number" id="score-number">0</span>
+                        <span class="score-unit">/100</span>
+                    </div>
+                    <p class="score-subtitle" id="score-subtitle"></p>
+                </div>
+
+                <!-- 小丑类型卡片 -->
+                <div id="type-card" class="type-card hidden">
+                    <div class="type-card-inner">
+                        <div class="type-color-bar" id="type-color-bar"></div>
+                        <div class="type-info">
+                            <h3 id="type-name"></h3>
+                            <p id="type-desc"></p>
+                            <p class="type-suggestion" id="type-suggestion"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 数据可视化区 -->
+                <div class="charts-grid">
+                    <!-- 五维雷达图 -->
+                    <div class="chart-card">
+                        <h4 class="chart-title">🎯 五维小丑雷达图</h4>
+                        <div class="chart-wrapper">
+                            <canvas id="radarChart"></canvas>
+                        </div>
+                    </div>
+                    <!-- 基础统计对比 -->
+                    <div class="chart-card">
+                        <h4 class="chart-title">📊 双方数据对比</h4>
+                        <div class="chart-wrapper">
+                            <canvas id="barChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 比率仪表盘 -->
+                <div class="gauges-row">
+                    <div class="gauge-card" id="gauge-message">
+                        <div class="gauge-ring"></div>
+                        <span class="gauge-value"></span>
+                        <span class="gauge-label">消息比</span>
+                    </div>
+                    <div class="gauge-card" id="gauge-chars">
+                        <div class="gauge-ring"></div>
+                        <span class="gauge-value"></span>
+                        <span class="gauge-label">字数比</span>
+                    </div>
+                    <div class="gauge-card" id="gauge-sticker">
+                        <div class="gauge-ring"></div>
+                        <span class="gauge-value"></span>
+                        <span class="gauge-label">表情比</span>
+                    </div>
+                    <div class="gauge-card" id="gauge-streak">
+                        <div class="gauge-ring"></div>
+                        <span class="gauge-value"></span>
+                        <span class="gauge-label">连发比</span>
+                    </div>
+                    <div class="gauge-card" id="gauge-picture">
+                        <div class="gauge-ring"></div>
+                        <span class="gauge-value"></span>
+                        <span class="gauge-label">图片比</span>
+                    </div>
+                </div>
+
+                <!-- 聊天记录回放 -->
+                <div class="chat-replay-section">
+                    <h4 class="chart-title">💬 聊天记录回放</h4>
+                    <div id="chat-replay" class="chat-replay"></div>
+                </div>
+
+                <!-- AI 情感疏导 -->
+                <div id="guidance-section" class="guidance-section hidden">
+                    <h4 class="chart-title" id="guidance-title">💌 AI 深度情感诊断报告</h4>
+                    <div id="guidance-content" class="guidance-content"></div>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="action-buttons">
+                    <button class="btn btn-outline" onclick="location.reload()">🔄 重新分析</button>
+                    <button class="btn btn-primary" id="share-btn">📸 生成分享图片</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- ========== 音乐播放器 ========== -->
+    <div id="music-bar" class="music-bar hidden">
+        <div class="music-bar-inner">
+            <button id="music-toggle-btn" class="music-btn" title="播放/暂停">▶</button>
+            <div class="music-info">
+                <span class="music-icon">🎵</span>
+                <span id="music-track-name" class="music-track-name">未播放</span>
+            </div>
+            <input type="range" id="music-volume" class="music-volume" min="0" max="100" value="30" title="音量">
+            <audio id="music-audio" loop preload="none"></audio>
+        </div>
+    </div>
+
+    <!-- ========== 页脚 ========== -->
+    <footer class="footer">
+        <p>Made with ❤️ for Engineering 101 · <span id="footer-status">AI 状态检测中...</span></p>
+    </footer>
+
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/charts.js"></script>
+</body>
+</html>
