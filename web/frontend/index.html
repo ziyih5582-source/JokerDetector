@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>观心潭 · 情感分析与联系人名册</title>
+<link rel="stylesheet" href="/static/css/ink.css">
+</head>
+<body data-view="pond">
+
+<!-- 水墨鱼塘：始终在最底层，透过纸面参与所有界面 -->
+<canvas id="pond-canvas" aria-hidden="true"></canvas>
+<div class="veil" aria-hidden="true"></div>
+
+<div class="scroll">
+  <header class="masthead">
+    <a class="mark" href="/" data-go="pond" aria-label="回到水面">潭</a>
+    <div class="masthead-title">
+      <h1>观心潭</h1>
+      <p>把聊天投进水里 · 情感分析与联系人名册</p>
+    </div>
+    <nav class="ledger" id="nav" aria-label="主要功能">
+      <button type="button" data-go="flow">投食</button>
+      <i aria-hidden="true"></i>
+      <button type="button" data-go="fisherman">问钓翁</button>
+      <i aria-hidden="true"></i>
+      <button type="button" data-go="book">名册</button>
+      <i aria-hidden="true"></i>
+      <button type="button" data-go="config">墨设</button>
+    </nav>
+  </header>
+
+  <main class="stage">
+
+    <!-- ============ 一 · 水面（入口） ============ -->
+    <section class="view" data-view="pond">
+      <div class="pond-copy">
+        <p class="vertical-note" aria-hidden="true">投食观心</p>
+        <h2 class="pond-title">水面之下，谁一直在游向对方</h2>
+        <p class="pond-sub">
+          把一段聊天洒进水里：算法量比例，AI 读语气，名册替你记住对方说过什么。
+          两个功能合在一处，一次投食同时得到水纹与笔记。
+        </p>
+        <div class="pond-actions">
+          <button type="button" class="seal-btn" data-go="flow">投食</button>
+          <button type="button" class="line-btn" data-go="book">翻开名册</button>
+        </div>
+        <p class="pond-hint">轻点纸面任一处置食 · 鱼会摆尾游过来</p>
+      </div>
+    </section>
+
+    <!-- ============ 二 · 投食（统一入口：分析 + 建档） ============ -->
+    <section class="view" data-view="flow">
+      <div class="lede">
+        <span class="eyebrow">其一 · 投食</span>
+        <h2>把一段聊天投入水中</h2>
+        <p>每行「发言者：内容」，或导入微信导出的 Excel。一次提交同时产出情感分析，并按需写入名册；不选联系人则只看水纹，不落一笔。</p>
+      </div>
+
+      <div class="grid">
+        <div class="col-main">
+          <label class="field-label" for="chat-text">聊天原文</label>
+          <textarea id="chat-text" rows="8" spellcheck="false"
+            placeholder="我：周末有什么安排？&#10;小林：我喜欢徒步&#10;我：那一起去吧"></textarea>
+
+          <div class="line-actions">
+            <button type="button" id="parse-text" class="line-btn">辨认说话的人</button>
+            <label class="line-btn" for="chat-file">择卷（Excel）
+              <input id="chat-file" type="file" accept=".xlsx,.xls" hidden>
+            </label>
+            <button type="button" id="sample-one" class="line-btn quiet">示例 · 初</button>
+            <button type="button" id="sample-two" class="line-btn quiet">示例 · 变</button>
+            <button type="button" id="clear-chat" class="line-btn quiet">清空</button>
+            <span id="message-count" class="note"></span>
+          </div>
+
+          <div id="speaker-panel" hidden>
+            <div class="two-up">
+              <div>
+                <label class="field-label" for="self-speaker">水里的我</label>
+                <select id="self-speaker"></select>
+              </div>
+              <div>
+                <label class="field-label" for="other-speaker">对方（写入名册的人）</label>
+                <select id="other-speaker"></select>
+              </div>
+            </div>
+            <details class="preview">
+              <summary>核对脱敏预览 <span id="preview-count" class="note"></span></summary>
+              <p class="note">只有勾选云端 AI 时，下面这些片段才会发出去；档案只留脱敏引用。自动脱敏认不出所有隐私，请自行删去不愿处理的内容。</p>
+              <pre id="redacted-preview"></pre>
+            </details>
+          </div>
+
+          <h3 class="block-title"><span>例</span>或取一瓢现成的</h3>
+          <div id="demo-list" class="demo-list"></div>
+        </div>
+
+        <aside class="col-side">
+          <h3 class="block-title"><span>册</span>这份记录归谁</h3>
+          <select id="contact-select"></select>
+          <div class="line-actions">
+            <input id="contact-name" placeholder="新的称呼" maxlength="60" autocomplete="off">
+            <button type="button" id="create-contact" class="line-btn quiet">录名</button>
+          </div>
+          <p class="note" id="archive-note"></p>
+
+          <h3 class="block-title"><span>约</span>三处约定</h3>
+          <label class="check"><input type="checkbox" id="save-consent"><span>我确认聊天双方与联系人的对应关系，并同意在本机保存脱敏后的档案依据。</span></label>
+          <label class="check"><input type="checkbox" id="use-ai"><span>本次使用云端 AI：把预览里的脱敏片段发给我配置的服务。</span></label>
+          <label class="check"><input type="checkbox" id="include-guidance" checked><span>同时生成 AI 情感分析长文（约 1000–2000 字，多一次调用，可能等待两分钟）。</span></label>
+
+          <button type="button" id="run-btn" class="seal-btn wide">洒入水中</button>
+          <p class="note" id="ai-status">正在读取服务状态…</p>
+          <p class="note">没有 API Key 也能用：本地统计与喜好提取全程不联网。</p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ 三 · 水纹（结果：分析 + 名册变动） ============ -->
+    <section class="view" data-view="result">
+      <div class="verdict">
+        <span class="eyebrow" id="source-note">其二 · 水纹</span>
+        <div class="verdict-line">
+          <div class="score-wrap">
+            <span class="score" id="score-number">0</span>
+            <span class="score-unit">/ 100</span>
+          </div>
+          <div class="verdict-text">
+            <h2 id="verdict-label"></h2>
+            <p id="score-subtitle"></p>
+          </div>
+          <div class="seal-type" id="type-seal" hidden><span id="type-seal-text"></span></div>
+        </div>
+      </div>
+
+      <section class="block" id="type-block" hidden>
+        <h3 class="block-title"><span>型</span>小丑类型</h3>
+        <p class="big-quote" id="type-desc"></p>
+        <p class="note" id="type-suggestion"></p>
+        <p class="keywords" id="type-keywords"></p>
+      </section>
+
+      <section class="block">
+        <h3 class="block-title"><span>画</span>五维墨线</h3>
+        <div class="ink-chart"><svg id="radar" viewBox="0 0 320 300" role="img" aria-label="五维倾向墨线图"></svg></div>
+        <ul class="metric-list" id="metric-list"></ul>
+      </section>
+
+      <section class="block">
+        <h3 class="block-title"><span>比</span>双方比对</h3>
+        <div class="compare" id="compare"></div>
+      </section>
+
+      <section class="block" id="profile-result" hidden>
+        <h3 class="block-title"><span>册</span>名册变动</h3>
+        <div id="profile-result-body"></div>
+      </section>
+
+      <section class="block" id="guidance-block" hidden>
+        <h3 class="block-title"><span>书</span><span id="guidance-title">AI 情感分析长文</span></h3>
+        <div class="long-text" id="guidance-content"></div>
+      </section>
+
+      <div class="line-actions">
+        <button type="button" class="line-btn" data-go="flow">再投一次</button>
+        <button type="button" class="line-btn quiet" id="share-btn">拓一张纸（导出图片）</button>
+        <button type="button" class="line-btn quiet" id="goto-book-from-result">去看名册</button>
+      </div>
+    </section>
+
+    <!-- ============ 四 · 问钓翁 ============ -->
+    <section class="view" data-view="fisherman">
+      <div class="lede">
+        <span class="eyebrow">其四 · 问钓翁</span>
+        <h2>潭边坐着一个人，可以问问他</h2>
+        <p>聊感情上的事不必先组织好语言。可以只是随便说说，也可以选定名册里的一个人，让钓翁先看过 TA 的档案再开口——那样的建议会贴着你这段关系，而不是泛泛的安慰。</p>
+      </div>
+
+      <div class="grid grid-roster">
+        <aside class="col-side">
+          <button type="button" id="fisher-new" class="line-btn">＋ 新对话</button>
+          <div id="fisher-list" class="roster"></div>
+
+          <h3 class="block-title"><span>谁</span>这次谈谁</h3>
+          <select id="fisher-contact" aria-label="选择要谈的人"></select>
+          <label class="check">
+            <input type="checkbox" id="fisher-use-profile">
+            <span>把 TA 的档案作为背景交给 AI，让建议落在具体的人身上。</span>
+          </label>
+          <details class="preview" id="fisher-context-box" hidden>
+            <summary>查看将发送的档案内容 <span id="fisher-context-count" class="note"></span></summary>
+            <pre id="fisher-context"></pre>
+          </details>
+          <p class="note" id="fisher-privacy">对话只留在这个标签页的内存里：刷新即消失，不写入名册、不写入数据库。你说的话会发给你配置的 AI 服务，发送前在本机做基础脱敏（电话、邮箱、证件号等），但脱敏认不出所有隐私。</p>
+        </aside>
+
+        <div class="col-main">
+          <div id="fisher-thread" class="thread"></div>
+          <div class="compose">
+            <label class="field-label" for="fisher-input">说给钓翁</label>
+            <textarea id="fisher-input" rows="3" placeholder="想到哪儿说到哪儿…（⌘ / Ctrl + Enter 发送）"></textarea>
+            <div class="line-actions">
+              <button type="button" id="fisher-send" class="seal-btn">说与钓翁</button>
+              <span class="note" id="fisher-status"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 四 · 名册 ============ -->
+    <section class="view" data-view="book">
+      <div class="lede">
+        <span class="eyebrow">其三 · 名册</span>
+        <h2>每一次聊天，多一点了解</h2>
+        <p>记下对方明确说过的喜好，也给每一条推测留出修正的余地。同一段聊天重复投入不会重复计数。</p>
+      </div>
+
+      <div class="grid grid-roster">
+        <aside class="col-side">
+          <label class="field-label" for="contact-search">寻名</label>
+          <input id="contact-search" type="search" placeholder="按称呼筛选" autocomplete="off">
+          <div id="contact-list" class="roster"></div>
+          <p class="note">档案在本机加密保存（<code>web/private_data/</code>）。密钥也在同一台机器上，无法防御已获得本机权限的人；迁移备份需同时保留数据库与密钥。</p>
+        </aside>
+
+        <div class="col-main">
+          <div id="no-contact" class="empty">
+            <p>还没有翻开任何一页。</p>
+            <p class="note">先在左侧「录名」，或到「投食」里投入一段聊天并选定联系人。</p>
+          </div>
+
+          <div id="contact-workspace" hidden>
+            <div class="roster-head">
+              <h3 id="profile-name"></h3>
+              <p class="note" id="profile-meta"></p>
+            </div>
+            <div class="tally">
+              <div><b id="fact-count">0</b><span>档案条目</span></div>
+              <div><b id="review-count">0</b><span>待核实</span></div>
+              <div><b id="batch-count">0</b><span>次投食</span></div>
+              <div><b id="revision">0</b><span>版本</span></div>
+            </div>
+            <div class="line-actions">
+              <button type="button" id="goto-flow" class="line-btn">为他/她投一段聊天</button>
+              <button type="button" id="export-contact" class="line-btn quiet">导出 JSON</button>
+              <button type="button" id="delete-contact" class="line-btn danger">抹去此人</button>
+            </div>
+
+            <h3 class="block-title"><span>好</span>喜好与观察</h3>
+            <p class="note">「原话提取」也可能有语境偏差；AI 观察一律待核实，不代表完整性格。</p>
+            <div id="facts" class="facts"></div>
+
+            <h3 class="block-title"><span>迹</span>投食记录</h3>
+            <div id="history" class="history"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 五 · 墨设 ============ -->
+    <section class="view" data-view="config">
+      <div class="lede">
+        <span class="eyebrow">其五 · 墨设</span>
+        <h2>一池水，两支笔</h2>
+        <p>本地算法是纸，云端 AI 是墨。不配置也能用完整体验，只是少了长文与推测型的观察。</p>
+      </div>
+
+      <div class="form-narrow">
+        <label class="field-label" for="ai-api-key">API Key</label>
+        <input id="ai-api-key" type="password" autocomplete="off" placeholder="sk-…">
+        <label class="field-label" for="ai-model">模型 ID</label>
+        <input id="ai-model" placeholder="服务商提供的完整模型标识" autocomplete="off" spellcheck="false">
+        <label class="field-label" for="ai-base-url">API 地址</label>
+        <input id="ai-base-url" value="https://api.deepseek.com">
+        <div class="line-actions">
+          <button type="button" id="ai-save-btn" class="line-btn">保存</button>
+          <button type="button" id="ai-test-btn" class="line-btn quiet">验证调用</button>
+          <span class="note" id="ai-config-msg"></span>
+        </div>
+        <p class="note">验证会向已配置的服务发送一段固定的虚构示例，会产生少量用量，不会发送你的聊天。配置只存在于服务进程内存里，重启后需要重填；也可以用 <code>DEEPSEEK_API_KEY</code> 等环境变量。</p>
+      </div>
+
+      <h3 class="block-title"><span>潭</span>水面的脾气</h3>
+      <div class="line-actions">
+        <button type="button" id="pond-toggle" class="line-btn quiet">静水（停动画）</button>
+        <button type="button" id="pond-scatter" class="line-btn quiet">随手撒一把食</button>
+      </div>
+
+      <h3 class="block-title"><span>乐</span>配乐</h3>
+      <div class="line-actions music-line">
+        <button type="button" id="music-toggle-btn" class="line-btn quiet">▶ 播放</button>
+        <span id="music-track-name" class="note">未选择曲目（判定后自动配乐）</span>
+        <input type="range" id="music-volume" min="0" max="100" value="30" aria-label="音量">
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="colophon">
+    <span id="footer-status">正在读取服务状态…</span>
+    <i aria-hidden="true"></i>
+    <span>仅供课程学习与娱乐，请勿用于真实情感决策</span>
+  </footer>
+</div>
+
+<div class="loading" id="loading" hidden>
+  <div class="loading-ink"><span></span></div>
+  <p id="loading-text">研墨中…</p>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<dialog id="edit-dialog">
+  <form id="edit-form">
+    <h2>修正这一条</h2>
+    <p class="note">修正后会标注「人工修正」，之后的自动提取只补依据，不会覆盖你写的描述。</p>
+    <label class="field-label" for="edit-text">修正内容</label>
+    <textarea id="edit-text" maxlength="200" rows="4" required></textarea>
+    <div class="line-actions">
+      <button type="button" id="cancel-edit" class="line-btn quiet">取消</button>
+      <button type="submit" class="seal-btn">留存</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="delete-dialog">
+  <h2 id="delete-title">确认删除？</h2>
+  <p id="delete-description" class="note"></p>
+  <div class="line-actions">
+    <button type="button" id="cancel-delete" class="line-btn quiet">取消</button>
+    <button type="button" id="confirm-delete" class="seal-btn danger">确认</button>
+  </div>
+</dialog>
+
+<audio id="music-audio" loop preload="none"></audio>
+
+<script src="/static/js/pond.js"></script>
+<script src="/static/js/ink.js"></script>
+</body>
+</html>

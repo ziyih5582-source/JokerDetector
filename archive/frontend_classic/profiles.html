@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>联系人档案 · Joker Detector</title>
+  <link rel="stylesheet" href="/static/css/profiles.css">
+  <script src="/static/js/profiles.js" defer></script>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="/">JD<span>JOKER DETECTOR</span></a><nav><a href="/">聊天分析</a><span class="nav-active">联系人档案</span></nav><span class="local-badge">● 本机保存</span></header>
+  <main class="workspace">
+    <aside class="sidebar">
+      <div class="sidebar-title"><h2>我的联系人</h2><span id="contact-count" class="pill">0</span></div>
+      <p class="muted">选择同一个人，让了解逐步积累。</p>
+      <form id="create-form"><label for="contact-name">新联系人称呼</label><div class="input-row"><input id="contact-name" maxlength="60" placeholder="使用昵称即可" required autocomplete="off"><button class="primary" type="submit">新建</button></div></form>
+      <label class="sr-only" for="contact-search">搜索联系人</label><input id="contact-search" type="search" placeholder="搜索联系人" autocomplete="off">
+      <div id="contact-list" class="contact-list"></div>
+      <div class="privacy-note"><span class="eyebrow">PRIVACY FIRST</span><h3>留住线索，少留隐私。</h3><p>档案在本机加密保存。完整聊天不存入档案库；只保留必要的脱敏引用。</p><details><summary>了解保存边界</summary><p>密钥也保存在本机，不能防御已获得本机权限的人。脱敏不能识别所有隐私，提交前请核对预览。本实验版仅适合单人本机使用。</p></details></div>
+    </aside>
+    <div class="main-column">
+      <section class="page-intro"><span class="eyebrow">CONTACT NOTEBOOK / 实验功能</span><h1>每一次聊天，多一点了解。</h1><p>记录对方表达过的喜好，也给每一个推测留出修正的空间。</p></section>
+      <div id="notice" role="status" aria-live="polite" class="notice" hidden></div>
+      <section id="no-contact" class="empty-panel"><span class="empty-icon">＋</span><h2>从一个联系人开始</h2><p>在左侧新建联系人，再导入聊天片段。<br>也可以用虚构示例体验两次更新与冲突提示。</p></section>
+      <div id="contact-workspace" hidden>
+        <section class="contact-header"><div><span class="eyebrow">当前档案</span><h2 id="profile-name"></h2><p id="profile-meta" class="muted"></p></div><div class="actions"><button id="export-contact" class="secondary">导出档案</button><button id="delete-contact" class="text-danger">删除联系人</button></div></section>
+        <div class="stat-row"><div><span id="fact-count">0</span><p>档案条目</p></div><div><span id="review-count">0</span><p>待核实</p></div><div><span id="batch-count">0</span><p>聊天更新</p></div></div>
+        <section class="card import-card"><div class="section-heading"><div><span class="eyebrow">01 / 添加线索</span><h2>追加一段聊天</h2></div><span class="pill">默认本地分析</span></div>
+          <p class="muted">仅支持双人聊天。请确认下面的“对方”就是当前联系人，避免同名或群聊内容混入。</p>
+          <div class="import-options"><label class="file-button" for="chat-file">↑ 导入 Excel<input id="chat-file" type="file" accept=".xlsx,.xls"></label><button id="sample-one" class="secondary">填入示例 · 第一次</button><button id="sample-two" class="secondary">填入示例 · 新变化</button></div>
+          <label for="chat-text">或粘贴文本 <span class="muted">每行“发言者：内容”</span></label><textarea id="chat-text" rows="4" placeholder="我：周末有什么安排？&#10;小林：我喜欢徒步"></textarea>
+          <div class="actions"><button id="parse-text" class="secondary">识别发言者</button><button id="clear-chat" class="quiet">清空本次聊天</button><span id="message-count" class="muted"></span></div>
+          <div id="speaker-panel" hidden><div class="speaker-grid"><div><label for="self-speaker">聊天中的我</label><select id="self-speaker"></select></div><div><label for="other-speaker">对方（将存入当前联系人）</label><select id="other-speaker"></select></div></div>
+            <details class="preview-box"><summary>核对脱敏预览 <span id="preview-count"></span></summary><p class="muted">云端只接收下列片段，不接收旧档案。姓名、地址等仍可能漏检，请自行删去不希望处理的内容。</p><pre id="redacted-preview"></pre></details>
+            <label class="checkbox"><input id="save-consent" type="checkbox">我确认聊天双方及联系人对应关系，并同意在本机保存必要的脱敏档案依据。</label>
+            <label class="checkbox"><input id="use-ai" type="checkbox">本次使用云端 AI：将预览中的脱敏片段发送至已配置的服务。</label>
+            <label class="checkbox"><input id="include-guidance" type="checkbox" checked>同时生成 AI 情感分析长文（需启用云端 AI，会增加一次模型调用）。</label>
+            <p id="ai-status" class="muted"></p>
+            <button id="analyze-profile" class="primary wide">分析并更新档案</button>
+          </div>
+        </section>
+        <section class="card"><div class="section-heading"><div><span class="eyebrow">02 / 逐步了解</span><h2>喜好与沟通观察</h2></div><span id="revision" class="pill">版本 0</span></div><p class="muted">“原话提取”也可能有语境偏差；AI 观察均待核实，不能代表完整性格。</p><div id="facts" class="facts"></div></section>
+        <section id="session-analysis" class="card" hidden><span class="eyebrow">本次片段 / 原项目统计</span><h2>聊天互动概览</h2><div id="analysis-summary" class="analysis-summary"></div><p class="muted">消息数量与字数仅描述这个片段，不代表感情、动机或人格。</p><div id="profile-guidance" hidden><h3>AI 情感分析长文</h3><p class="muted">本次报告展示在当前页面，完整长文不写入联系人档案库。</p><div id="profile-guidance-text" class="long-report"></div></div></section>
+        <section class="card"><div class="section-heading"><div><span class="eyebrow">03 / 更新足迹</span><h2>档案更新记录</h2></div></div><div id="history"></div></section>
+      </div>
+      <footer>Joker Detector · 联系人档案实验版 <span>记录事实，谨慎推测，随时修正。</span></footer>
+    </div>
+  </main>
+  <dialog id="edit-dialog"><form id="edit-form"><h2>修正档案条目</h2><p class="muted">修正后会标注“人工修正”，后续导入保留你的描述。</p><label for="edit-text">修正内容</label><textarea id="edit-text" maxlength="200" rows="4" required></textarea><div class="actions"><button type="button" id="cancel-edit" class="secondary">取消</button><button type="submit" class="primary">保存修正</button></div></form></dialog>
+  <dialog id="delete-dialog"><h2 id="delete-title">删除联系人？</h2><p id="delete-description"></p><div class="actions"><button id="cancel-delete" class="secondary">取消</button><button id="confirm-delete" class="danger">确认删除</button></div></dialog>
+</body></html>
