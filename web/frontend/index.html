@@ -263,23 +263,19 @@
     <section class="view" data-view="config">
       <div class="lede">
         <span class="eyebrow">其五 · 墨设</span>
-        <h2>一池水，两支笔</h2>
-        <p>本地算法是纸，云端 AI 是墨。不配置也能用完整体验，只是少了长文与推测型的观察。</p>
+        <h2>笔已备好</h2>
+        <p>云端 AI 已经由项目统一配置，你不需要填写任何 API Key。本地算法永远可用；云端只在你勾选后才会收到脱敏片段。</p>
       </div>
 
       <div class="form-narrow">
-        <label class="field-label" for="ai-api-key">API Key</label>
-        <input id="ai-api-key" type="password" autocomplete="off" placeholder="sk-…">
-        <label class="field-label" for="ai-model">模型 ID</label>
-        <input id="ai-model" placeholder="服务商提供的完整模型标识" autocomplete="off" spellcheck="false">
-        <label class="field-label" for="ai-base-url">API 地址</label>
-        <input id="ai-base-url" value="https://api.deepseek.com">
+        <label class="field-label">云端 AI 状态</label>
+        <p class="note" id="ai-config-state">正在读取配置…</p>
         <div class="line-actions">
-          <button type="button" id="ai-save-btn" class="line-btn">保存</button>
-          <button type="button" id="ai-test-btn" class="line-btn quiet">验证调用</button>
+          <button type="button" id="ai-test-btn" class="line-btn">验证调用</button>
+          <button type="button" id="ai-reload-btn" class="line-btn quiet">重新加载配置</button>
           <span class="note" id="ai-config-msg"></span>
         </div>
-        <p class="note">验证会向已配置的服务发送一段固定的虚构示例，会产生少量用量，不会发送你的聊天。配置只存在于服务进程内存里，重启后需要重填；也可以用 <code>DEEPSEEK_API_KEY</code> 等环境变量。</p>
+        <p class="note">验证会向已配置的服务发送一段固定的虚构示例，会产生少量用量，不会发送你的聊天。配置来自项目根目录 <code>.env</code> 里的 <code>DEEPSEEK_API_KEY</code>（也支持同名环境变量）；改完 <code>.env</code> 后点「重新加载配置」即可生效。密钥只留在服务端，不会下发到浏览器。</p>
       </div>
 
       <h3 class="block-title"><span>潭</span>水面的脾气</h3>

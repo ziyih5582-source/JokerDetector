@@ -36,7 +36,7 @@ python -m venv .venv
 
 保持窗口打开，浏览器访问 http://127.0.0.1:8000/ 。以后可双击 `start_profiles.bat` 启动。macOS / Linux 把 `.venv\Scripts\python` 换成 `.venv/bin/python` 即可。新功能要求 Python 3.10+，推荐 3.12。
 
-不填 API Key 也能用完整体验：本地统计与喜好提取都在本机完成。使用 AI 时在「墨设」里填写 API Key、API 地址和服务商提供的准确模型 ID，先保存，再验证，最后在「投食」里勾选云端选项。
+云端 AI 已由项目统一配置，使用者不需要填写 API Key。把 `.env.example` 复制成 `.env`（或直接使用分发方附带的 `.env`），Key 会在启动时自动读取；在「墨设」页点「验证调用」确认可用，然后在「投食」里勾选云端选项即可。没有 Key 时本地统计与喜好提取照常工作。
 
 完整说明：[联系人档案使用教程与实验限制](README_PROFILES.md)。本实验版适合单人本机运行，不包含多用户账号系统。
 
@@ -138,17 +138,14 @@ pip install -r web/requirements.txt
 
 #### 2. 配置 API（可选）
 
-有两种方式，任选其一：
+Web 版采用**统一配置**，使用者无需填写 Key，按下面的优先顺序读取：
 
-**方式 A：环境变量**（全局生效）
-- 在启动程序的终端设置 `DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL` 环境变量
-- `.env.example` 仅是变量名参考；程序目前不会自动加载 `.env` 文件。新手建议使用页面中的配置面板
+1. **项目根目录的 `.env`**（推荐）：把 `.env.example` 复制为 `.env`，填入 `DEEPSEEK_API_KEY` 等变量即可，程序启动时自动加载。改完 `.env` 后若服务已在运行，到「墨设」页点「重新加载配置」即可生效，不必重启。
+2. **进程环境变量**：优先级最高，适合 CI 或临时覆盖；若同名变量已存在，`.env` 不会覆盖它。
 
-**方式 B：运行时配置**
-- Web 版：启动后在「墨设」页填写
-- 桌面版：启动后在 GUI 中点击 **⚙️ AI 配置** 按钮填写
-
-> 页面填写的 API Key 仅保存在服务进程内存，重启后需重新填写。聊天数据默认在本地处理；只有勾选本次云端 AI 选项，才会发送基础脱敏后的片段。
+> `.env` 已被 `.gitignore` 排除。分发时请手动把配置好的 `.env` 随包提供，或让使用者使用真实环境变量。桌面版 `v5.py` 仍保留 GUI 内的 ⚙️ AI 配置 弹窗，可继续手动填写。
+>
+> 聊天数据默认在本地处理；只有勾选本次云端 AI 选项，才会发送基础脱敏后的片段。
 
 #### 3. 运行分析（Web 版，推荐）
 
@@ -179,7 +176,7 @@ python main.py
 📦 joker-detector
 ├── 📄 v5.py                    # 桌面 GUI 主程序（Tkinter）
 ├── 📄 start_profiles.bat       # Windows 一键启动 Web 版
-├── 📄 .env.example             # 环境变量配置模板
+├── 📄 .env.example             # 统一 AI 配置模板（复制为 .env 即可，已被 gitignore 排除）
 ├── 📄 README.md / README_PROFILES.md / LICENSE
 │
 ├── 📁 web/                     # Web 版（唯一的界面入口）
@@ -227,25 +224,25 @@ python main.py
 
 ### AI API 配置
 
-**方式一：环境变量（推荐）**
+**Web 版：统一配置（`.env` 或环境变量）**
 
-在启动程序的终端设置环境变量；以下展示变量名，具体值以服务商提供的信息为准。程序不会自动读取 `.env`：
+把 `.env.example` 复制为项目根目录的 `.env`，填入统一的那把 Key：
 
 ```env
-DEEPSEEK_API_KEY=sk-xxx          # 你的 API Key（支持任意 OpenAI 兼容 API）
-DEEPSEEK_BASE_URL=https://api.deepseek.com  # API 地址
-DEEPSEEK_MODEL=deepseek-chat     # 模型名称
+DEEPSEEK_API_KEY=sk-xxx                          # 项目统一的 API Key
+DEEPSEEK_BASE_URL=https://models.sjtu.edu.cn/api/v1  # API 地址（上海交大模型平台，OpenAI 兼容）
+DEEPSEEK_MODEL=deepseek-chat                     # 调用名：DeepSeek V4 Flash → deepseek-chat
 ```
 
-> `.env` 已被忽略。不要把真实密钥填写进 `.env.example` 或源代码。
+支持任意 OpenAI 兼容服务，换服务商时只需改 `DEEPSEEK_BASE_URL` 与 `DEEPSEEK_MODEL`，注意调用名必须与该平台一致。
 
-**方式二：桌面版 GUI 运行时配置**
+程序启动时会自动加载 `.env`；若同名进程环境变量已存在，则以环境变量为准。改完 `.env` 后在「墨设」页点「重新加载配置」即可生效，无需重启。
+
+> `.env` 已被忽略，不会入库。**不要把真实密钥写进 `.env.example` 或源代码**；`DEEPSEEK_API_KEY` 也不要写成 `os.getenv("X", "sk-真实Key")` 这种带默认值的形式。
+
+**桌面版：GUI 运行时配置**
 
 启动 `v5.py` 后，点击左侧面板的 **⚙️ AI 配置** 按钮，即可在弹窗中填写 API Key / Base URL / 模型名称。
-
-**方式三：Web 版前端配置**
-
-启动 Web 版后，在页面左侧的 AI 配置面板中填写。
 
 > 💡 未配置 API Key 时，程序将使用纯算法模式，跳过 AI 功能，所有聊天记录仅在本地处理。
 
@@ -315,7 +312,7 @@ DEEPSEEK_MODEL=deepseek-chat     # 模型名称
 
 本仓库公开，请勿把下面这些东西提交上来：
 
-- **API Key**：代码只从环境变量或页面配置读取，不要写进源码，也不要用 `os.getenv("X", "sk-真实Key")` 这种带默认值的写法——它看起来像占位符，其实是把密钥提交了。
+- **API Key**：统一配置只从 `.env` 或进程环境变量读取。`.env` 本身已被忽略，但仍要确认它没有被 `git add -f` 强制加进来；也绝不要写进 `analyzer.py` 或用 `os.getenv("X", "sk-真实Key")` 这种带默认值的写法——它看起来像占位符，其实是把密钥提交了。分发打包时若把 `.env` 一起给出，请走私下渠道，不要附在公开压缩包里。
 - **真实聊天记录**：`database/test1.xls` 是真实私人对话，已在 `.gitignore` 中排除，只在本地保留。要演示请用仓库里的虚构样例或内置 Demo。
 - **联系人档案**：`web/private_data/` 存的是加密档案库与密钥，已排除。备份时两个文件要一起带走。
 - **商业音乐与配图**：`music/` 与 `pictures/` 里的内容不入库，克隆后请自备同名文件；缺少时程序照常运行，只是没有配乐与配图。

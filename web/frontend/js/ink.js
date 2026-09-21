@@ -933,15 +933,21 @@
       var data = await api('/api/health');
       state.health = data;
       $('footer-status').textContent = data.ai_available
-        ? (data.ai_verified ? 'AI 已配置并已验证 · ' + data.ai_model : 'AI 已配置，尚未验证 · ' + data.ai_model)
-        : '仅本地模式 · 未配置云端 AI';
+        ? (data.ai_verified ? '云端 AI 已就绪并已验证 · ' + data.ai_model : '云端 AI 已就绪，尚未验证 · ' + data.ai_model)
+        : '仅本地模式 · 云端 AI 未配置';
       $('ai-status').textContent = data.ai_available
         ? '云端已就绪：' + data.ai_model + '（只有勾选后才会发送脱敏片段）'
-        : '未配置云端 AI。本地统计与喜好提取可直接使用。';
+        : '云端 AI 未配置，本地统计与喜好提取可直接使用。';
+      var stateEl = $('ai-config-state');
+      if (stateEl) {
+        stateEl.textContent = data.ai_available
+          ? (data.ai_verified ? '已配置并验证通过 · ' + data.ai_model : '已配置，尚未验证 · ' + data.ai_model)
+          : '未配置：请在项目根目录 .env 填写 DEEPSEEK_API_KEY 后点「重新加载配置」。';
+      }
       if ($('fisher-status') && !state.fisher.streaming) {
         $('fisher-status').textContent = data.ai_available
           ? '钓翁已就绪 · ' + data.ai_model
-          : '未配置云端 AI · 到「墨设」配置后钓翁才听得见';
+          : '云端 AI 未配置 · 钓翁暂时听不见';
       }
       return data;
     } catch (e) {
@@ -952,29 +958,21 @@
   }
 
   function initConfig() {
-    $('ai-save-btn').addEventListener('click', function () {
-      guard(async function () {
-        var apiKey = $('ai-api-key').value.trim();
-        var model = $('ai-model').value.trim();
-        var baseUrl = $('ai-base-url').value.trim();
-        if (!apiKey) throw new Error('请填入 API Key');
-        if (!model) throw new Error('请填入服务商提供的完整模型 ID');
-        var data = await api('/api/config', {
-          method: 'POST', body: JSON.stringify({ api_key: apiKey, model: model, base_url: baseUrl })
-        });
-        $('ai-api-key').value = '';
-        $('ai-config-msg').textContent = data.success
-          ? '已保存 ' + data.model + '，接着点「验证调用」确认真的能用。'
-          : '配置未被接受，请检查 Key 与地址。';
-        await health();
-      });
-    });
-
     $('ai-test-btn').addEventListener('click', function () {
       guard(async function () {
         $('ai-config-msg').textContent = '正在发送一段固定的虚构示例…';
         var data = await api('/api/config/test', { method: 'POST' });
         $('ai-config-msg').textContent = data.success ? '验证成功：' + data.message : '验证失败：' + data.error.message;
+        await health();
+      });
+    });
+
+    $('ai-reload-btn').addEventListener('click', function () {
+      guard(async function () {
+        var data = await api('/api/config/reload', { method: 'POST' });
+        $('ai-config-msg').textContent = data.success
+          ? '已重新加载：' + data.model + '，可点「验证调用」确认。'
+          : '仍未读到 Key，请检查项目根目录 .env 的 DEEPSEEK_API_KEY。';
         await health();
       });
     });
@@ -1404,7 +1402,7 @@
     var health = state.health || await health();
     if (!health || !health.ai_available) {
       $('fisher-status').textContent = '钓翁要连通云端才听得见你说话。';
-      say('还没有配置云端 AI。到「墨设」填好 API Key、模型 ID 与地址，点「验证调用」之后就能聊了。', true);
+      say('云端 AI 未配置：请在项目根目录 .env 填写 DEEPSEEK_API_KEY，到「墨设」点「重新加载配置」后再试。', true);
       return;
     }
     var chat = activeChat();
