@@ -14,7 +14,8 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 import uvicorn
 
-from analyzer import JokerAnalyzer, JOKER_TYPES, NOT_JOKER_DESC
+from analyzer import (JokerAnalyzer, JOKER_TYPES, NOT_JOKER_DESC, METRIC_WEIGHTS,
+                       SCORE_MIDPOINT, SCORE_STEEPNESS, VOICE_PENALTY)
 from demo_data import DEMO_CASES
 from fisherman import install_routes as install_fisherman
 from profile_routes import install_routes, run_unified, get_store
@@ -222,6 +223,40 @@ async def analyze_upload(
     return _format_response(result, file.filename)
 
 
+@app.get("/api/guide")
+async def guide():
+    """解说文档的数据源：阈值、权重、指标含义、类型、上限都在这里，避免文档与代码脱节。"""
+    from profile_routes import get_store  # 仅用于提示档案目录，不读取内容
+    return {
+        "score_scale": {
+            "formula": "score = 100 / (1 + e^(-%.1f × (Z − %.2f)))" % (SCORE_STEEPNESS, SCORE_MIDPOINT),
+            "z_total": " + ".join("%.2f·%s" % (METRIC_WEIGHTS[k], k) for k in METRIC_WEIGHTS),
+            "note": "每个维度先被换算成 −1～1 的相对值（这一项你比对方重多少），加权求和后过 logistic 曲线，再乘上语音/通话折扣 %.2f。中点 %.2f 意味着「五维整体略微偏向你」就正好是 50 分；曲线偏陡，所以整体稍微偏向一侧，分数就会明显离开中段。" % (VOICE_PENALTY, SCORE_MIDPOINT),
+            "voice_penalty": VOICE_PENALTY,
+        },
+        "levels": [{"min": minimum, "key": key} for minimum, key in LEVEL_THRESHOLDS],
+        "metrics": [
+            {"key": key, "label": METRIC_DOCS[key]["label"], "desc": METRIC_DOCS[key]["desc"],
+             "how": METRIC_DOCS[key]["how"], "weight": METRIC_WEIGHTS[key]}
+            for key in METRIC_DOCS
+        ],
+        "type_rule": "取五维里数值最高的那一项：连续发送→幻恋型，衔接度→镜像型，低姿态→弄臣型，其余→殉道型。",
+        "types": JOKER_TYPES,
+        "not_joker_desc": NOT_JOKER_DESC,
+        "limits": {
+            "upload_mb": 5,
+            "max_rows": 1000,
+            "max_chars": 120000,
+            "cloud_chars": 40000,
+            "facts_per_contact": 500,
+            "batches_per_contact": 200,
+            "evidence_per_fact": 10,
+            "chat_turns": 40,
+            "chat_chars": 24000,
+        },
+    }
+
+
 @app.get("/api/joker_types")
 async def joker_types():
     """获取所有小丑类型定义"""
@@ -299,11 +334,9 @@ def _format_response(result: dict, source_name: str) -> dict:
             }
         },
         "z_metrics": {
-            "SSDT": {"value": z['SSDT'], "label": "连续发送倾向", "desc": "你是否连续发消息不给对方插话机会"},
-            "PFI": {"value": z['PFI'], "label": "自我中心指数", "desc": "你对话中'我'的使用密度对比"},
-            "PLD": {"value": z['PLD'], "label": "低姿态语言密度", "desc": "道歉、语气词、犹豫词的使用频率"},
-            "EPEG": {"value": z['EPEG'], "label": "情感表达差", "desc": "你与对方的情绪表达强度差异"},
-            "CONV": {"value": z['CONV'], "label": "对话衔接度", "desc": "双方回应对方话题的投入程度"}
+            key: {"value": z[key], "label": METRIC_DOCS[key]["label"], "desc": METRIC_DOCS[key]["desc"],
+                  "weight": METRIC_WEIGHTS[key]}
+            for key in METRIC_DOCS
         },
         "guidance": result.get('guidance'),
         "guidance_error": result.get('guidance_error'),
@@ -311,17 +344,50 @@ def _format_response(result: dict, source_name: str) -> dict:
     }
 
 
+# 判定阈值：/api/guide 的解说页读的就是这张表，改这里等于同时改文档
+LEVEL_THRESHOLDS = [
+    (75, "confirmed"),
+    (60, "high_risk"),
+    (45, "suspicious"),
+    (30, "mild"),
+    (0, "healthy"),
+]
+
+# 五个维度的说明：结果页与解说页共用
+METRIC_DOCS = {
+    "SSDT": {
+        "label": "连续发送倾向",
+        "desc": "你是否连续发消息不给对方插话机会",
+        "how": "统计一方连续发言的最长段数，取你与对方的相对差",
+    },
+    "PFI": {
+        "label": "自我中心指数",
+        "desc": "你对话中「我」的使用密度对比",
+        "how": "比较「我 / 俺」与「我们 / 咱们」的出现比例，再看双方的相对差",
+    },
+    "PLD": {
+        "label": "低姿态语言密度",
+        "desc": "道歉、语气词、犹豫词的使用频率",
+        "how": "统计「可能 / 有点 / 对不起 / 好吗 / ？」这类词在总字数里的占比",
+    },
+    "EPEG": {
+        "label": "情感表达差",
+        "desc": "你与对方的情绪表达强度差异",
+        "how": "统计情绪词与感叹号数量，取双方对数差（相差约 2 倍即达到满值）",
+    },
+    "CONV": {
+        "label": "对话衔接度",
+        "desc": "双方回应对方话题的投入程度",
+        "how": "看接话时是否复用对方上一句里的连接词，比较两个方向的接话率",
+    },
+}
+
+
 def _get_level(score: float) -> str:
-    if score > 75:
-        return "confirmed"
-    elif score >= 60:
-        return "high_risk"
-    elif score >= 45:
-        return "suspicious"
-    elif score >= 30:
-        return "mild"
-    else:
-        return "healthy"
+    for minimum, key in LEVEL_THRESHOLDS:
+        if score >= minimum:
+            return key
+    return "healthy"
 
 
 def _safe_ratio(a, b):

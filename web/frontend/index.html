@@ -26,6 +26,10 @@
       <i aria-hidden="true"></i>
       <button type="button" data-go="book">名册</button>
       <i aria-hidden="true"></i>
+      <button type="button" data-go="theory">理论</button>
+      <i aria-hidden="true"></i>
+      <button type="button" data-go="guide">讲解</button>
+      <i aria-hidden="true"></i>
       <button type="button" data-go="config">墨设</button>
     </nav>
   </header>
@@ -259,10 +263,121 @@
       </div>
     </section>
 
+    <!-- ============ 五 · 理论 ============ -->
+    <section class="view" data-view="theory">
+      <div class="lede">
+        <span class="eyebrow">其五 · 理论</span>
+        <h2>关系背后的几副镜片</h2>
+        <p>这里整理了心理学里若干被反复研究过的理论与效应，每一条都写明提出者、年份与出处，并指出它和本项目里哪个指标有关。它们是理解关系的镜片，不是给你或给对方下的判决书。</p>
+      </div>
+      <nav class="toc" id="theory-toc" aria-label="理论目录"></nav>
+      <div id="theory-body"></div>
+      <h3 class="block-title"><span>慎</span>这些理论不能用来做什么</h3>
+      <ul class="caveats" id="theory-caveats"></ul>
+      <h3 class="block-title"><span>源</span>参考资料</h3>
+      <div class="refs" id="theory-refs"></div>
+      <section class="block">
+        <p class="note">本页内容由 <code>web/frontend/js/theory.js</code> 提供，欢迎自行增补或修正；每条都建议保留可核查的出处。</p>
+      </section>
+    </section>
+
+    <!-- ============ 六 · 讲解 ============ -->
+    <section class="view" data-view="guide">
+      <div class="lede">
+        <span class="eyebrow">其六 · 讲解</span>
+        <h2>这个项目到底能做什么</h2>
+        <p>一句话：把一段聊天变成两份东西——一份量化的关系画像，一份关于对方的笔记。这一页讲清每处怎么点、数字怎么来的、什么会被发到云端。</p>
+      </div>
+
+      <nav class="toc" id="guide-toc" aria-label="讲解目录"></nav>
+
+      <h3 class="block-title"><span>一</span>一分钟上手</h3>
+      <ol class="steps" id="guide-steps">
+        <li>点「投食」，把聊天粘进文本框（每行「发言者：内容」），或导入微信导出的 Excel，然后点「辨认说话的人」。</li>
+        <li>核对「水里的我」和「对方」；想积累笔记，就在右栏选一个名册条目并勾选确认第一项。</li>
+        <li>点「洒入水中」。结果页会同时给出<b>水纹</b>（分数、类型、五维、双方比对）与<b>名册变动</b>（新增了哪几条喜好、有没有互相冲突）。</li>
+        <li>想找人聊聊，就去「问钓翁」；想只分析不留痕，把「这份记录归谁」留成「不建档」。</li>
+      </ol>
+      <p class="note">没有 API Key 也能走完整个流程：解析、统计、脱敏、喜好提取全在本机完成，一次网络请求都不会发出。</p>
+
+      <h3 class="block-title"><span>二</span>五处板块各管什么</h3>
+      <div class="panels" id="guide-panels">
+        <div class="panel">
+          <h4>水面</h4>
+          <p>入口。一片朦胧的水墨鱼塘，点纸面任意处投食，附近的鱼会摆尾游过来吃掉。纯粹是气氛，不影响任何数据。</p>
+        </div>
+        <div class="panel">
+          <h4>投食</h4>
+          <p>唯一的输入口。粘贴文本或导入 Excel、辨认说话的人、核对脱敏预览、决定这次是否写进名册、是否调用云端 AI。示例按钮可以先用虚构内容跑一遍。</p>
+        </div>
+        <div class="panel">
+          <h4>水纹</h4>
+          <p>结果页。给出分数与判定、类型印章、五维墨线、双方比对，以及本次的名册变动与可选的 AI 情感长文。可以「拓一张纸」导出图片。</p>
+        </div>
+        <div class="panel">
+          <h4>问钓翁</h4>
+          <p>和 AI 聊感情问题。可以只随便聊，也可以选定一个人、把 TA 的脱敏档案作为背景交给 AI，让建议落在具体的人身上。随时可「新对话」，对话只存在浏览器内存里。</p>
+        </div>
+        <div class="panel">
+          <h4>名册</h4>
+          <p>联系人档案。按人累积「喜好」与「沟通观察」，每条都保留脱敏依据，正反冲突并存，可以人工确认、修正、抹去，也可以导出 JSON。档案在本机加密保存。</p>
+        </div>
+        <div class="panel">
+          <h4>墨设</h4>
+          <p>配置云端 AI：API Key、模型 ID、API 地址。填完先保存，再点「验证调用」——只有真实请求成功才算配置好。另外还有静水、撒食与配乐。</p>
+        </div>
+      </div>
+
+      <h3 class="block-title"><span>三</span>分数是怎么算出来的</h3>
+      <div id="guide-score"></div>
+      <h3 class="block-title"><span>四</span>五维各看什么</h3>
+      <div class="rows" id="guide-metrics"></div>
+      <h3 class="block-title"><span>五</span>判定区间</h3>
+      <div class="rows" id="guide-levels"></div>
+      <p class="note">分数只描述所提交的这一段聊天，会随片段长短与选谁当「我」而变。桌面版 <code>v5.py</code> 用的是旧版比率制（0.2 / 0.5 / 1.0 / 2.0 分档），数值口径与网页版不同，不要混着比较。</p>
+
+      <h3 class="block-title"><span>六</span>四种类型</h3>
+      <p class="note" id="guide-type-rule"></p>
+      <div class="types" id="guide-types"></div>
+
+      <h3 class="block-title"><span>七</span>什么留在本地，什么会发出去</h3>
+      <div class="panels">
+        <div class="panel">
+          <h4>只在本机</h4>
+          <p>Excel 解析、统计与打分、手机号/邮箱等基础脱敏、喜好提取、档案加密存储（<code>web/private_data/</code>）。完整聊天内容不会进入档案库，也不写进数据库。</p>
+        </div>
+        <div class="panel">
+          <h4>勾选后才走网络</h4>
+          <p>「本次使用云端 AI」——发送脱敏后的片段去提取喜好与生成情感长文；「问钓翁」——发送你说的话，以及你勾选的那个人的脱敏档案背景。两处都会在页面上先给你看要发什么。</p>
+        </div>
+        <div class="panel">
+          <h4>从不保存</h4>
+          <p>问钓翁的对话只留在当前标签页内存里，刷新即消失，服务端不落盘。API Key 只存在服务进程内存，重启需重填。</p>
+        </div>
+      </div>
+
+      <h3 class="block-title"><span>八</span>输入格式与上限</h3>
+      <div class="rows" id="guide-limits"></div>
+
+      <h3 class="block-title"><span>九</span>常见问题</h3>
+      <div class="faq" id="guide-faq">
+        <details><summary>没有 API Key 能用吗？</summary><p>能。除了「问钓翁」必须联网，其它功能都能离线完成，包括喜好提取与档案管理。</p></details>
+        <details><summary>为什么 AI 一直不可用？</summary><p>去「墨设」按三步走：填 API Key、模型 ID、API 地址 → 点「保存」→ 点「验证调用」。只有真实请求成功才会标为已验证；失败时页面会给出具体原因（密钥、余额、模型 ID、限流、超时等）。</p></details>
+        <details><summary>为什么两次分析的分数不一样？</summary><p>分数只反映你这一次提交的那段聊天。片段越短、双方越不对等，分数越容易走极端；换一个片段、甚至把「我」和「对方」换了，都会变。</p></details>
+        <details><summary>为什么类型会跳来跳去？</summary><p>类型取的是五维里数值最高的那一项，不同片段的「最高项」很可能是不同的维度，所以类型会变。它更像一句总结，不是人格标签。</p></details>
+        <details><summary>为什么没有认出任何喜好？</summary><p>本地提取只认明确的第一人称日常喜好（「我喜欢徒步」这类）。复杂表达、反讽、生日与关键事件都不在覆盖范围内，宁可留白也不乱猜。想让 AI 帮忙推断，就勾选云端 AI。</p></details>
+        <details><summary>重复导入同一段聊天会怎样？</summary><p>同一段脱敏片段按指纹去重：名册不会重复记账，也不会重复调用云端。除非上次 AI 失败，或者你这次额外勾选了生成情感长文。</p></details>
+        <details><summary>AI 长文没出来？</summary><p>结果页会显示具体原因，本地统计仍然保留。常见原因是超时（长文有独立的 90 秒超时）、额度不足或模型 ID 与服务商不匹配。</p></details>
+        <details><summary>这些数字能当诊断用吗？</summary><p>不能。这是一个课程作业里的趣味算法，标签和分数都不是心理测量工具，也不能代表任何人的感情或人格。</p></details>
+      </div>
+
+      <p class="disclaimer">本项目仅供课程学习与娱乐，请勿用于真实情感决策。如果你正处在持续的痛苦里，寻求现实中的专业帮助比任何算法都重要。</p>
+    </section>
+
     <!-- ============ 五 · 墨设 ============ -->
     <section class="view" data-view="config">
       <div class="lede">
-        <span class="eyebrow">其五 · 墨设</span>
+        <span class="eyebrow">其六 · 墨设</span>
         <h2>一池水，两支笔</h2>
         <p>本地算法是纸，云端 AI 是墨。不配置也能用完整体验，只是少了长文与推测型的观察。</p>
       </div>
@@ -336,6 +451,7 @@
 
 <audio id="music-audio" loop preload="none"></audio>
 
+<script src="/static/js/theory.js"></script>
 <script src="/static/js/pond.js"></script>
 <script src="/static/js/ink.js"></script>
 </body>

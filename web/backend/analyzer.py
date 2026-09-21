@@ -17,6 +17,18 @@ API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 
+# ================== 五维权重（评分与解说文档共用同一份） ==================
+METRIC_WEIGHTS = {
+    'SSDT': 0.25,   # 连续发送倾向
+    'PFI': 0.20,    # 自我中心指数
+    'PLD': 0.20,    # 低姿态语言密度
+    'EPEG': 0.15,   # 情感表达差
+    'CONV': 0.20,   # 对话衔接度
+}
+SCORE_MIDPOINT = 0.05     # logistic 的中点：Z 总分达到它时分数正好 50
+SCORE_STEEPNESS = 5.0     # logistic 的陡峭程度
+VOICE_PENALTY = 0.95      # 出现语音/通话记录时的折扣
+
 # ================== 小丑类型定义 ==================
 JOKER_TYPES = {
     "殉道型": {
@@ -267,11 +279,12 @@ class JokerAnalyzer:
                 base_ba += 1
         Z_CONV = (conv_ab / (base_ab + 1e-6)) - (conv_ba / (base_ba + 1e-6))
 
-        # 综合评分
-        Z_Total = 0.25 * Z_SSDT + 0.2 * Z_PFI + 0.2 * Z_PLD + 0.15 * Z_EPEG + 0.2 * Z_CONV
-        score = 100 / (1 + math.exp(-5.0 * (Z_Total - 0.05)))
+        # 综合评分：五维相对值加权后过 logistic，映射到 0–100
+        parts = {'SSDT': Z_SSDT, 'PFI': Z_PFI, 'PLD': Z_PLD, 'EPEG': Z_EPEG, 'CONV': Z_CONV}
+        Z_Total = sum(METRIC_WEIGHTS[k] * v for k, v in parts.items())
+        score = 100 / (1 + math.exp(-SCORE_STEEPNESS * (Z_Total - SCORE_MIDPOINT)))
         if stats['has_voice_or_call']:
-            score *= 0.95
+            score *= VOICE_PENALTY
 
         stats['jokernum_alg'] = round(score, 2)
         stats['z_metrics'] = {

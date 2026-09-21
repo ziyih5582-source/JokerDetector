@@ -22,6 +22,8 @@
     lastResult: null,
     music: [],
     health: null,
+    guide: null,
+    theoryDone: false,
     fisher: { list: [], activeId: null, streaming: false }
   };
 
@@ -125,6 +127,8 @@
 
   function go(view) {
     document.body.dataset.view = view;
+    if (view === 'theory') renderTheory();
+    if (view === 'guide') renderGuide();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -750,6 +754,10 @@
       list.append(li);
     });
     list.append(el('p', 'note', '墨线从中线出发：向右是「比对方更重」，向左是「比对方更轻」。悬停可见每项含义。'));
+    var explain = el('button', 'line-btn quiet', '这几项是怎么算的');
+    explain.type = 'button';
+    explain.addEventListener('click', function () { go('guide'); });
+    list.append(explain);
   }
 
   function renderCompare(stats) {
@@ -1173,6 +1181,239 @@
     });
   }
 
+  // ------------------------------------------------------------ 解说页（讲解）
+  // 数字全部来自 /api/guide（与判定逻辑同一份来源），文案在本文件里；
+  // 目录由各板块标题自动生成，所以加了板块就会自动出现在目录里。
+
+  function buildToc(viewName, tocId) {
+    var view = document.querySelector('.view[data-view="' + viewName + '"]');
+    var toc = $(tocId);
+    if (!view || !toc) return;
+    toc.replaceChildren();
+    var nodes = view.querySelectorAll('.block-title, .group-title');
+    Array.prototype.forEach.call(nodes, function (node, i) {
+      if (!node.id) node.id = viewName + '-sec-' + i;
+      // 标题里第一个 span 是朱砂序号，不进目录
+      var clone = node.cloneNode(true);
+      var mark = clone.querySelector('span');
+      if (mark) mark.remove();
+      var text = clone.textContent.replace(/\s+/g, ' ').trim();
+      var link = el('a', '', text);
+      link.href = '#' + node.id;
+      toc.append(link);
+    });
+  }
+
+  function row(k, v, w, two) {
+    var node = el('div', 'row' + (two ? ' two' : ''));
+    node.append(el('span', 'k', k));
+    if (!two) node.append(el('span', 'w', w || ''));
+    node.append(el('span', 'v', v));
+    return node;
+  }
+
+  function rowRich(k, w, parts) {
+    var node = el('div', 'row');
+    node.append(el('span', 'k', k));
+    node.append(el('span', 'w', w || ''));
+    var v = el('span', 'v');
+    parts.forEach(function (part) {
+      if (part.em) v.append(el('em', '', part.text));
+      else v.append(document.createTextNode(part.text));
+    });
+    node.append(v);
+    return node;
+  }
+
+  var LIMIT_TEXT = {
+    upload_mb: ['上传文件', '单个 Excel 不超过 5 MB'],
+    max_rows: ['单次行数', '最多读取 1000 行'],
+    max_chars: ['单次字数', '最多 12 万字'],
+    cloud_chars: ['云端上限', '勾选云端 AI 时最多 4 万字，超出请拆分'],
+    batches_per_contact: ['投食次数', '每位联系人最多累积 200 次'],
+    facts_per_contact: ['档案条目', '每位联系人最多 500 条']
+  };
+  var LIMIT_TAIL = {
+    evidence_per_fact: ['每条依据', '同一条信息最多保留 10 条不同依据'],
+    chat_turns: ['问钓翁条数', '单次对话最多携带 40 条历史'],
+    chat_chars: ['问钓翁字数', '单次对话总字数不超过 2.4 万']
+  };
+
+  async function renderGuide() {
+    buildToc('guide', 'guide-toc');
+    if (state.guide === 'loading' || state.guide) return;
+    state.guide = 'loading';
+    var data;
+    try {
+      data = await api('/api/guide');
+    } catch (error) {
+      $('guide-score').textContent = '读不到讲解数据：' + error.message;
+      state.guide = null;
+      return;
+    }
+    state.guide = data;
+
+    // 分数怎么来
+    var scoreBox = $('guide-score');
+    scoreBox.replaceChildren();
+    scoreBox.append(el('p', 'note', data.score_scale.note));
+    var formula = el('div', 'score-formula');
+    var c1 = el('code', '', data.score_scale.formula);
+    formula.append(c1);
+    scoreBox.append(formula);
+    var rows = el('div', 'rows');
+    rows.append(rowRich('加权求和', '五维', [{ text: data.score_scale.z_total }]));
+    rows.append(rowRich('语音折扣', '×' + data.score_scale.voice_penalty,
+      [{ text: '这段聊天里出现语音或通话记录时，分数乘以该系数（旧版规则沿用至今）' }]));
+    scoreBox.append(rows);
+
+    // 五维
+    var metrics = $('guide-metrics');
+    metrics.replaceChildren();
+    data.metrics.forEach(function (metric) {
+      metrics.append(rowRich(metric.label, '权重 ' + metric.weight, [
+        { text: metric.desc + '。' }, { text: '算法：' + metric.how, em: true }
+      ]));
+    });
+
+    // 判定区间
+    var levels = $('guide-levels');
+    levels.replaceChildren();
+    var sorted = data.levels.slice().sort(function (a, b) { return b.min - a.min; });
+    sorted.forEach(function (level, i) {
+      var upper = i === 0 ? null : sorted[i - 1].min;
+      var range = upper === null ? level.min + ' 分以上' : (level.min + ' – ' + upper + ' 分');
+      if (level.min === 0) range = '低于 ' + sorted[sorted.length - 2].min + ' 分';
+      levels.append(rowRich(range, '', [
+        { text: (LEVEL_NAME[level.key] || level.key) + ' —— ' },
+        { text: LEVEL_TEXT[level.key] || '', em: true }
+      ]));
+    });
+
+    // 类型
+    $('guide-type-rule').textContent = data.type_rule;
+    var types = $('guide-types');
+    types.replaceChildren();
+    Object.keys(data.types).forEach(function (name) {
+      var info = data.types[name];
+      var entry = el('div', 'type-entry');
+      entry.append(el('h4', '', name));
+      entry.append(el('p', '', info.desc));
+      entry.append(el('p', '', '建议 · ' + info.suggestion));
+      entry.append(el('p', 'keys', '关键信号：' + (info.keywords || []).join(' · ')));
+      types.append(entry);
+    });
+
+    // 上限
+    var limits = $('guide-limits');
+    limits.replaceChildren();
+    Object.keys(LIMIT_TEXT).concat(Object.keys(LIMIT_TAIL)).forEach(function (key) {
+      var pair = LIMIT_TEXT[key] || LIMIT_TAIL[key];
+      var value = data.limits[key];
+      if (value === undefined) return;
+      limits.append(row(pair[0], pair[1], value));
+    });
+  }
+
+  // ------------------------------------------------------------ 理论页
+
+  function renderTheory() {
+    var data = window.THEORY;
+    buildToc('theory', 'theory-toc');
+    if (!data || state.theoryDone) return;
+    state.theoryDone = true;
+
+    var body = $('theory-body');
+    body.replaceChildren();
+    if (data.intro) body.append(el('p', 'note', data.intro));
+
+    var idx = 0;
+    data.groups.forEach(function (group) {
+      var title = el('h3', 'group-title');
+      title.append(el('span', '', group.mark || ''));
+      title.append(el('span', '', group.title));
+      body.append(title);
+      if (group.note) body.append(el('p', 'group-note', group.note));
+
+      group.items.forEach(function (item) {
+        idx += 1;
+        var entry = el('article', 'entry');
+
+        var head = el('div', 'entry-head');
+        head.append(el('span', 'idx', String(idx).padStart(2, '0')));
+        head.append(el('h4', '', item.name));
+        if (item.en) head.append(el('span', 'en', item.en));
+        if (item.who) head.append(el('span', 'by', item.who + (item.year ? ' · ' + item.year : '')));
+        entry.append(head);
+
+        entry.append(el('p', 'core', item.core));
+
+        var facts = el('dl', 'facts');
+        [['关键发现', item.evidence], ['注意', item.caveat], ['在本项目里', item.inapp]].forEach(function (pair) {
+          if (!pair[1]) return;
+          facts.append(el('dt', '', pair[0]));
+          facts.append(el('dd', '', pair[1]));
+        });
+        entry.append(facts);
+
+        var foot = el('div', 'entry-foot');
+        if (item.sources && item.sources.length) {
+          var src = el('span', 'src', '出处：');
+          item.sources.forEach(function (source) {
+            var link = el('a', '', source.label);
+            link.href = source.url;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            src.append(link);
+          });
+          foot.append(src);
+        }
+        if (item.ask) {
+          var ask = el('button', 'line-btn quiet', '拿去问钓翁');
+          ask.type = 'button';
+          ask.addEventListener('click', function () {
+            go('fisherman');
+            var input = $('fisher-input');
+            input.value = item.ask;
+            input.focus();
+            say('已把这个问题放进「问钓翁」的输入框，你可以改完再发。');
+          });
+          foot.append(ask);
+        }
+        entry.append(foot);
+        body.append(entry);
+      });
+    });
+
+    var caveats = $('theory-caveats');
+    caveats.replaceChildren();
+    (data.caveats || []).forEach(function (text) { caveats.append(el('li', '', text)); });
+
+    // 参考资料从各条目的出处汇总去重，避免两处维护对不上
+    var refs = $('theory-refs');
+    refs.replaceChildren();
+    var collected = [];
+    data.groups.forEach(function (group) {
+      group.items.forEach(function (item) {
+        (item.sources || []).forEach(function (source) {
+          if (source.url) collected.push({ label: source.label, url: source.url, who: item.who || '', year: item.year || '' });
+        });
+      });
+    });
+    var used = {};
+    collected.forEach(function (source) {
+      if (used[source.url]) return;
+      used[source.url] = true;
+      var link = el('a', '', source.label);
+      link.href = source.url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.append(el('span', '', source.who + (source.year ? ' · ' + source.year : '')));
+      refs.append(link);
+    });
+    if (!collected.length) refs.append(el('p', 'note', '出处正在补齐。'));
+  }
+
   // ------------------------------------------------------------ 问钓翁（情感对话）
   // 对话只存在内存里；服务端不保存。选定名册里的某个人并勾选后，
   // 才把 TA 的脱敏档案作为背景发出去（可得先用预览确认发了什么）。
@@ -1459,6 +1700,7 @@
     initConfig();
     initMusic();
     initFisherman();
+    renderTheory();
     // 云端与长文默认都关掉，由用户自己打开
     $('include-guidance').checked = false;
     $('use-ai').checked = false;
