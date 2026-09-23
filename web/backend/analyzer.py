@@ -7,15 +7,44 @@
 import os
 import re
 import math
+from pathlib import Path
+
 import pandas as pd
 from openai import OpenAI
 import httpx
 from profiles import prepare_messages, ai_error_detail, ai_request_options, AIResultError
 
+
 # ================== AI 配置 ==================
-API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
-BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+# 统一配置：优先读进程环境变量，其次读项目根目录的 .env 文件。
+# 使用者不需要在网页里填 Key，只要 .env 里写好一次即可。
+ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+
+
+def _load_env_file():
+    """把 .env 里的键值对读进 os.environ，已存在的变量不覆盖。"""
+    if not ENV_FILE.exists():
+        return
+    try:
+        lines = ENV_FILE.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+_load_env_file()
+
+API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
+BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").strip()
+MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat").strip()
 
 # ================== 五维权重（评分与解说文档共用同一份） ==================
 METRIC_WEIGHTS = {
@@ -72,7 +101,8 @@ class JokerAnalyzer:
         self._init_ai()
 
     def _init_ai(self):
-        if not API_KEY or API_KEY.startswith("sk-xxx"):
+        # 占位符与空值都视为「未配置」
+        if not API_KEY or API_KEY.startswith("sk-xxx") or API_KEY.startswith("sk-你的"):
             return
         try:
             self.client = OpenAI(
@@ -87,24 +117,13 @@ class JokerAnalyzer:
     def ai_available(self) -> bool:
         return self.client is not None
 
-    def update_ai_config(self, api_key: str, model: str = "deepseek-chat", base_url: str = None):
-        """运行时更新 AI 配置，重新初始化客户端"""
+    def reload_ai_config(self):
+        """按当前环境变量 / .env 重新初始化客户端。固定配置模式下不再接受运行时 Key。"""
         self.ai_verified = False
-        if not api_key or len(api_key.strip()) < 10:
-            self.client = None
-            return False
-        self.ai_model = model
-        url = base_url or BASE_URL
-        try:
-            self.client = OpenAI(
-                api_key=api_key.strip(),
-                base_url=url,
-                http_client=httpx.Client(trust_env=False)
-            )
-            return True
-        except Exception:
-            self.client = None
-            return False
+        self.client = None
+        self.ai_model = MODEL or "deepseek-chat"
+        self._init_ai()
+        return self.client is not None
 
     # ---------- 聊天记录解析 ----------
     def parse_chat(self, file_path):

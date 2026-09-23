@@ -5,7 +5,6 @@
 
 import os
 import tempfile
-from urllib.parse import urlsplit
 from typing import Optional
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Request
 from fastapi.staticfiles import StaticFiles
@@ -64,10 +63,11 @@ if os.path.exists(MUSIC_DIR):
     app.mount("/music", StaticFiles(directory=MUSIC_DIR), name="music")
 
 # Pydantic 模型
-class AIConfig(BaseModel):
-    api_key: str = ""
-    model: str = "deepseek-chat"
-    base_url: str = "https://api.deepseek.com"
+class AIConfigInfo(BaseModel):
+    """只读的 AI 配置状态：不接收也不回传任何密钥。"""
+    configured: bool
+    model: Optional[str] = None
+    base_url: Optional[str] = None
 
 
 @app.get("/")
@@ -110,21 +110,21 @@ async def list_music():
     return {"music": files, "url_prefix": "/music/"}
 
 
-@app.post("/api/config")
-async def update_config(config: AIConfig):
-    """更新 AI 配置"""
-    config.model = config.model.strip()
-    config.base_url = config.base_url.strip()
-    if not config.model:
-        raise HTTPException(400, "请输入完整模型 ID")
-    if urlsplit(config.base_url).scheme != "https":
-        raise HTTPException(400, "AI 服务地址必须使用 HTTPS")
-    ok = analyzer.update_ai_config(config.api_key, config.model, config.base_url)
-    return {
-        "success": ok,
-        "ai_available": analyzer.ai_available,
-        "model": analyzer.ai_model if analyzer.ai_available else None
-    }
+@app.get("/api/config")
+async def get_config():
+    """查看当前统一的 AI 配置。只暴露「是否已配置」与模型名，绝不回传密钥。"""
+    return AIConfigInfo(
+        configured=analyzer.ai_available,
+        model=analyzer.ai_model if analyzer.ai_available else None,
+        base_url=str(analyzer.client.base_url) if analyzer.ai_available else None,
+    )
+
+
+@app.post("/api/config/reload")
+async def reload_config():
+    """在 .env 被改动后重新加载统一配置。"""
+    ok = analyzer.reload_ai_config()
+    return {"success": ok, "ai_available": analyzer.ai_available, "model": analyzer.ai_model if ok else None}
 
 
 @app.post("/api/config/test")
@@ -132,7 +132,7 @@ def test_ai_config():
     """Make a real extraction request using only this fixed fictional sample."""
     active_client, active_model = analyzer.client, analyzer.ai_model
     if active_client is None:
-        raise HTTPException(400, "请先保存 API Key、模型 ID 和 API 地址")
+        raise HTTPException(400, "统一配置尚未生效：请在项目根目录的 .env 中填写 DEEPSEEK_API_KEY，再点“重新加载配置”")
     try:
         extract_ai([{"id": 0, "role": "self", "content": "你喜欢什么？"},
                     {"id": 1, "role": "other", "content": "我喜欢徒步"}], active_client, active_model)
