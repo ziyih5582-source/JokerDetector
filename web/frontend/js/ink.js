@@ -46,6 +46,36 @@
   };
   var METRIC_ORDER = ['SSDT', 'PFI', 'PLD', 'EPEG', 'CONV'];
   // 类型 → 朱砂以外的墨色倾向（用于印章与配图氛围）
+    // 五维指标的悬停释义
+  var METRIC_TIPS = {
+    SSDT: {
+      title: '连续发送倾向',
+      body: '比较你与对方连续发送消息的情况。数值偏上，表示这一行为在你的聊天中相对更多。',
+      method: '算法依据：统计相邻消息是否连续由同一人发送。'
+    },
+    PFI: {
+      title: '自我中心指数',
+      body: '观察聊天中“我、俺、自己”和“我们、咱们”等词语的相对使用情况。',
+      method: '算法依据：比较双方自我指代词与集体指代词的相对使用程度。'
+    },
+    PLD: {
+      title: '低姿态语言密度',
+      body: '观察道歉、犹豫、缓和语气等表达在聊天中的出现密度。数值偏上，表示这类表达在你的消息中相对更多。',
+      method: '算法依据：统计“可能、也许、对吧、对不起、抱歉”等预设词语及相关符号。'
+    },
+    EPEG: {
+      title: '情感表达差',
+      body: '比较你与对方在情感词和情感符号上的使用强度差异。',
+      method: '算法依据：统计预设情感词以及“！”等情感信号的出现情况。'
+    },
+    CONV: {
+      title: '对话衔接度',
+      body: '观察你的回复与对方上一条消息在用词上的衔接程度。数值偏上，表示你的回复更常出现这种衔接。',
+      method: '算法依据：检查相邻双方消息是否共同出现预设的功能词。'
+    }
+  };
+
+  var metricTooltip = null;
   var TYPE_INK = {
     '殉道型': '#A8443A', '镜像型': '#4A6478', '弄臣型': '#9A7628', '幻恋型': '#6B5580'
   };
@@ -573,6 +603,99 @@
     requestAnimationFrame(step);
   }
 
+  // ------------------------------------------------------------ 五维指标悬停提示
+
+  function ensureMetricTooltip() {
+    if (metricTooltip) return metricTooltip;
+
+    metricTooltip = el('div', 'metric-tooltip');
+    metricTooltip.id = 'metric-tooltip';
+    metricTooltip.setAttribute('role', 'tooltip');
+
+    var kicker = el('div', 'metric-tooltip-kicker', '五维释义');
+    var title = el('div', 'metric-tooltip-title');
+    var body = el('div', 'metric-tooltip-body');
+    var method = el('div', 'metric-tooltip-method');
+
+    metricTooltip.append(kicker, title, body, method);
+    document.body.append(metricTooltip);
+
+    return metricTooltip;
+  }
+
+  function metricTipContent(key, metric) {
+    var tip = METRIC_TIPS[key] || {};
+    return {
+      title: tip.title || (metric && metric.label) || key,
+      body: tip.body || (metric && metric.desc) || '',
+      method: tip.method || ''
+    };
+  }
+
+  function moveMetricTooltip(clientX, clientY) {
+    if (!metricTooltip) return;
+
+    var gap = 16;
+    var pad = 14;
+    var width = metricTooltip.offsetWidth;
+    var height = metricTooltip.offsetHeight;
+    var left = clientX + gap;
+    var top = clientY + gap;
+
+    if (left + width > window.innerWidth - pad) {
+      left = clientX - width - gap;
+    }
+    if (top + height > window.innerHeight - pad) {
+      top = clientY - height - gap;
+    }
+
+    left = Math.max(pad, left);
+    top = Math.max(pad, top);
+    metricTooltip.style.left = left + 'px';
+    metricTooltip.style.top = top + 'px';
+  }
+
+  function showMetricTooltip(key, metric, clientX, clientY) {
+    var tip = ensureMetricTooltip();
+    var content = metricTipContent(key, metric);
+
+    tip.querySelector('.metric-tooltip-title').textContent = content.title;
+    tip.querySelector('.metric-tooltip-body').textContent = content.body;
+    tip.querySelector('.metric-tooltip-method').textContent = content.method;
+    tip.classList.add('is-visible');
+    moveMetricTooltip(clientX, clientY);
+  }
+
+  function hideMetricTooltip() {
+    if (!metricTooltip) return;
+    metricTooltip.classList.remove('is-visible');
+  }
+
+  function bindMetricTooltip(node, key, metric) {
+    if (!node) return;
+
+    node.classList.add('metric-help-target');
+    node.setAttribute('tabindex', '0');
+    node.setAttribute('aria-describedby', 'metric-tooltip');
+
+    node.addEventListener('mouseenter', function (event) {
+      showMetricTooltip(key, metric, event.clientX, event.clientY);
+    });
+    node.addEventListener('mousemove', function (event) {
+      moveMetricTooltip(event.clientX, event.clientY);
+    });
+    node.addEventListener('mouseleave', function () {
+      hideMetricTooltip();
+    });
+    node.addEventListener('focus', function () {
+      var rect = node.getBoundingClientRect();
+      showMetricTooltip(key, metric, rect.left + rect.width / 2, rect.top + rect.height / 2);
+    });
+    node.addEventListener('blur', function () {
+      hideMetricTooltip();
+    });
+  }
+
   function renderProfileOutcome(result, meta) {
     var block = $('profile-result');
     var body = $('profile-result-body');
@@ -717,14 +840,27 @@
       svg.append(dot);
 
       var label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      var lp = point(k2, R + 26);
-      label.setAttribute('x', lp[0].toFixed(1));
-      label.setAttribute('y', (lp[1] + 4).toFixed(1));
-      label.setAttribute('text-anchor', Math.abs(lp[0] - cx) < 6 ? 'middle' : (lp[0] > cx ? 'start' : 'end'));
-      label.setAttribute('font-size', '11.5');
-      label.setAttribute('fill', k2 === maxIndex ? '#a63c30' : 'rgba(77,73,69,0.95)');
-      label.setAttribute('font-family', 'var(--serif)');
-      label.textContent = metrics[keys[k2]].label;
+var lp = point(k2, R + 26);
+var metricKey = keys[k2];
+var metric = metrics[metricKey];
+
+label.setAttribute('x', lp[0].toFixed(1));
+label.setAttribute('y', (lp[1] + 4).toFixed(1));
+label.setAttribute(
+  'text-anchor',
+  Math.abs(lp[0] - cx) < 6 ? 'middle' : (lp[0] > cx ? 'start' : 'end')
+);
+label.setAttribute('font-size', '11.5');
+label.setAttribute(
+  'fill',
+  k2 === maxIndex ? '#a63c30' : 'rgba(77,73,69,0.95)'
+);
+label.setAttribute('font-family', 'var(--serif)');
+label.textContent = metric.label;
+
+// 鼠标悬停显示指标释义
+bindMetricTooltip(label, metricKey, metric);
+
       svg.append(label);
     }
   }
@@ -736,7 +872,11 @@
       var metric = metrics[key];
       if (!metric) return;
       var li = el('li', 'metric-item');
-      li.append(el('span', 'name', metric.label));
+
+      var name = el('span', 'name', metric.label);
+      bindMetricTooltip(name, key, metric);
+      li.append(name);
+
       var track = el('span', 'track');
       var fill = el('span', 'fill');
       var value = Math.max(-1, Math.min(1, metric.value));
