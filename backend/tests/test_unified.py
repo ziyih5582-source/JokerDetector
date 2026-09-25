@@ -172,3 +172,9 @@ def test_ai_transcript_marks_emotion():
     text = _build_transcript([("我", "[表情]"), ("对方", "你好")], "我", ["开心", None])
     assert "（表情情绪：开心）" in text
     assert text.count("（表情情绪：") == 1
+
+
+def test_health_reports_ocr_availability(client):
+    """前端据此在未安装 OCR 依赖时置灰「导入长截图」入口。"""
+    data = client.get("/api/health").json()
+    assert isinstance(data["ocr_available"], bool)

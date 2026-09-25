@@ -12,7 +12,7 @@
 | 应用版本 | `2.2.0-experimental`（`backend/app/core/config.py` 的 `APP_VERSION`，由 `backend/app/main.py` 传给 FastAPI） |
 | 性质 | 工程学导论课程项目，单机实验版 |
 | 许可 | MIT（见 [`LICENSE`](LICENSE)） |
-| 当前测试 | 111 项自动化测试全部通过 |
+| 当前测试 | 112 项自动化测试全部通过 |
 | 运行时 | Python 3.10+（推荐 3.12）、FastAPI + 原生 JS，无前端框架 |
 
 ---
@@ -83,7 +83,7 @@
 │   │   │   ├── report.py       # build_report()、LEVEL_THRESHOLDS、METRIC_DOCS、level_for()
 │   │   │   ├── demo_data.py    # 三个内置虚构示例案例
 │   │   │   └── ocr.py          # 微信长截图：本地 OCR、版面重建、时间/类型标记（可选依赖）
-│   ├── tests/                  # 111 项自动化测试（6 个文件）
+│   ├── tests/                  # 112 项自动化测试（6 个文件）
 │   ├── requirements.txt
 │   ├── requirements-ocr.txt    # 可选：长截图识别依赖
 │   └── pyproject.toml          # pytest / ruff 配置（pythonpath=["."]）
@@ -652,7 +652,7 @@ AI 条目标记为 `origin="ai"`、`certainty="tentative"`——**与本地提�
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/`、`/profiles` | 均返回同一个单页工作台 `frontend/index.html` |
-| GET | `/api/health` | `status`、`ai_available`、`ai_verified`、`ai_model`、`ai_provider`、`music_available`、`version` |
+| GET | `/api/health` | `status`、`ai_available`、`ai_verified`、`ai_model`、`ai_provider`、`music_available`、`ocr_available`、`version` |
 | GET | `/api/config` | 只读配置状态 `{configured, model, base_url}`（不含密钥） |
 | POST | `/api/config/reload` | 重载 `.env` |
 | POST | `/api/config/test` | 用**固定虚构示例**验证调用；成功才置 `ai_verified=true` |
@@ -820,7 +820,7 @@ cd backend && ..\.venv\Scripts\python -m pytest -q  # Windows
 
 在项目根也可以直接 `make test`（等价于 `cd backend && pytest`）。`backend/pyproject.toml` 里配置了 `pythonpath=["."]`，测试文件因此直接写 `from app.main import app`、`from app.api import deps`，不再需要早先那套 `sys.path.insert(...)`。
 
-### 10.2 111 项测试的分布与主题
+### 10.2 112 项测试的分布与主题
 
 六个测试文件都在 `backend/tests/` 下：
 
@@ -880,7 +880,7 @@ docs/PROFILES.md 明确声明，这里也照录：
 | **本次协作合并** | 解决本地与远端历史分叉（见 §11.3） |
 | **目录重构：前后端分离** | 原来的 `web/` 拆成 `backend/`（FastAPI，可独立部署）与 `frontend/`（纯静态，可单独托管），HTTP 路由按 `api/routes/*.py` 的 `APIRouter` 拆分、请求模型移入 `schemas/`、常量与路径收敛到 `core/config.py`；根目录的样例、音乐、配图、文档、桌面版与启动脚本分别移入 `data/`、`assets/`、`docs/`、`legacy/`、`scripts/`；原 `archive/` 目录整体删除，不再保留；新增 `Makefile` 与 GitHub Actions CI |
 | **前端改名与思源湖主题重做** | 站点由「观心潭」改名为**「交心 · 思源湖研究所」**，并按校园「谈心 + 自查」的口径重写文案：首页画卷（`frontend/img/siyuan-lake.jpg`，以及由 `siyuan-lake-soft.jpg` 做的「卷中题记」水色横带）、三步上手、三件事（量一量 / 记下来 / 说出口），以及显式的"不是诊断"声明与真实求助入口（校内心理健康教育与咨询中心、12356、120/110）。导航改为七个去处，另有一个不在导航里的结果页**「分析结果」**（保留「水纹」别名）；按钮与板块名全部改成大白话（投食→谈心分析、洒入水中→开始分析、择卷→导入 Excel、录名→新建档案、抹去→删除、拓一张纸→导出为图片、再投一次→再分析一段、静水→暂停湖面动画、配乐→背景音乐、讲解→使用说明、理论→心理学依据、墨设→设置），钓翁人设保留但移到「思源湖畔」。前端新增 `#nav-here`「你在这里」指示（`ink.js` 的 `VIEW_LABELS` / `setHere()`）与卷首 grid 排版；鱼只在首页之外的页面出现（`body[data-view="pond"]` 时画布透明），点纸面空白处撒食。后端未配置云端时的提示改指「设置」，`test_fisherman.py` 的断言随之更新；测试仍为 **77 项** |
-| **微信长截图导入（阶段 1 + 2 + 3）** | 新增 `services/ocr.py` 与 `POST /api/profiles/parse-image`：本机 RapidOCR 识别长截图，按版面重建消息（左右归属、可见时间分隔的推测传播、文字/表情/图片/语音标记）；阶段 2 增加头像定位与「疑似情侣头像」的配色/结构相似度提示（前端展示两张头像并供人工确认）；阶段 3 增加 `services/emoji.py`，在 `assets/emoji/` 提供按情绪命名的模板时对表情气泡做本地颜色/结构匹配、自动填情绪，无素材则默认关闭、由用户手选。前端排成可逐条修改的校对表；提交时只取 `speaker+content`，元数据只展示、不参与评分。OCR 依赖放在可选的 `requirements-ocr.txt`，未装时接口返回 503。随后支持**一次导入多张**：接口同时接受 `file` 与重复的 `files`，按选择顺序拼接，并用 `merge_message_batches` 去掉滚动接缝与图内相邻的重复（一次最多 `MAX_IMAGES` 张）。又针对超长截图做了优化：`recognize_image` 纵向分块 OCR（重叠 + 跨块去重）、版面检测降采样、气泡尺寸下限改按图宽，像素上限提到 8000 万；前端校对表改为「文字默认折叠、图片/表情常展开并可选情绪、点缩略图看原图」。随后修掉「头像常被当成表情」（头像排除不再要求近似方形）、把「我 / 对方」选择移到识别结果前面，并让校准确认的表情情绪作为独立字段进入脱敏片段与 AI 对话（本地评分不受影响）。又过滤掉手机界面区域（顶部状态栏/标题栏、底部输入栏）并识别标题栏昵称用于「对方」显示；情绪修改会实时刷新脱敏预览；切换消息类型会同步替换 `[表情]/[图片]/[语音]` 占位内容。新增 `test_ocr.py`（28 项）与 `test_emoji.py`（4 项），总数 **111 项** |
+| **微信长截图导入（阶段 1 + 2 + 3）** | 新增 `services/ocr.py` 与 `POST /api/profiles/parse-image`：本机 RapidOCR 识别长截图，按版面重建消息（左右归属、可见时间分隔的推测传播、文字/表情/图片/语音标记）；阶段 2 增加头像定位与「疑似情侣头像」的配色/结构相似度提示（前端展示两张头像并供人工确认）；阶段 3 增加 `services/emoji.py`，在 `assets/emoji/` 提供按情绪命名的模板时对表情气泡做本地颜色/结构匹配、自动填情绪，无素材则默认关闭、由用户手选。前端排成可逐条修改的校对表；提交时只取 `speaker+content`，元数据只展示、不参与评分。OCR 依赖放在可选的 `requirements-ocr.txt`，未装时接口返回 503。随后支持**一次导入多张**：接口同时接受 `file` 与重复的 `files`，按选择顺序拼接，并用 `merge_message_batches` 去掉滚动接缝与图内相邻的重复（一次最多 `MAX_IMAGES` 张）。又针对超长截图做了优化：`recognize_image` 纵向分块 OCR（重叠 + 跨块去重）、版面检测降采样、气泡尺寸下限改按图宽，像素上限提到 8000 万；前端校对表改为「文字默认折叠、图片/表情常展开并可选情绪、点缩略图看原图」。随后修掉「头像常被当成表情」（头像排除不再要求近似方形）、把「我 / 对方」选择移到识别结果前面，并让校准确认的表情情绪作为独立字段进入脱敏片段与 AI 对话（本地评分不受影响）。又过滤掉手机界面区域（顶部状态栏/标题栏、底部输入栏）并识别标题栏昵称用于「对方」显示；情绪修改会实时刷新脱敏预览；切换消息类型会同步替换 `[表情]/[图片]/[语音]` 占位内容。`/api/health` 增加 `ocr_available`，前端据此在未安装 OCR 依赖时置灰「导入长截图」入口并提示安装命令。新增 `test_ocr.py`（28 项）与 `test_emoji.py`（4 项），总数 **112 项** |
 
 ### 11.2 桌面版 `legacy/desktop/v5.py` 的现状
 
@@ -1011,7 +1011,7 @@ cp .env.example .env      # 然后填入 DEEPSEEK_API_KEY
 
 **② 测试数量**
 
-`README.md` 项目结构一节曾写"71 项自动化测试"，实际为 **77 项**。**已改**：README 现在写 77 项，与 `docs/PROFILES.md` 及本文档一致。（本轮新增长截图识别、头像提示、表情情绪模板、多图合并、超长图分块、界面区域过滤、昵称识别、类型切换同步与情绪送 AI 后，实际为 **111 项**，README 与本文档均已同步。）
+`README.md` 项目结构一节曾写"71 项自动化测试"，实际为 **77 项**。**已改**：README 现在写 77 项，与 `docs/PROFILES.md` 及本文档一致。（本轮新增长截图识别、头像提示、表情情绪模板、多图合并、超长图分块、界面区域过滤、昵称识别、类型切换同步、情绪送 AI 与 OCR 可用性提示后，实际为 **112 项**，README 与本文档均已同步。）
 
 **③ 前端视图清单**
 

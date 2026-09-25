@@ -23,6 +23,7 @@ from app.services.analyzer import (
     VOICE_PENALTY,
 )
 from app.services.demo_data import DEMO_CASES
+from app.services import ocr
 from app.services.profiles import ai_error_detail, extract_ai
 from app.services.report import LEVEL_THRESHOLDS, METRIC_DOCS
 
@@ -39,6 +40,7 @@ async def health():
         "ai_model": analyzer.ai_model if analyzer.ai_available else None,
         "ai_provider": str(analyzer.client.base_url) if analyzer.ai_available else None,
         "music_available": os.path.exists(config.MUSIC_DIR),
+        "ocr_available": ocr.available(),
         "version": config.APP_VERSION,
     }
 

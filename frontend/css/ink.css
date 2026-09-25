@@ -542,6 +542,7 @@ body[data-view="guide"] .view[data-view="guide"] { display: block; }
 .line-btn.quiet { color: var(--ink-soft); border-bottom-color: var(--hairline-2); }
 .line-btn.danger { color: var(--vermilion); border-bottom-color: rgba(166, 60, 48, .35); }
 .line-btn:disabled { opacity: .4; cursor: not-allowed; }
+.line-btn.disabled { opacity: .4; cursor: not-allowed; }
 .line-actions {
   display: flex;
   flex-wrap: wrap;

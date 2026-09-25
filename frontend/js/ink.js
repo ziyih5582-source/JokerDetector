@@ -283,6 +283,20 @@
     $('archive-note').textContent = hasContact
       ? '这段聊天的喜好与观察会写进所选档案；需要勾选下面第一项确认。'
       : '只做分析，不写入档案、不落一笔。聊天的完整内容不会进入任何数据库。';
+    syncOcrEntry();
+  }
+
+  var OCR_INSTALL_HINT = '未安装 OCR 依赖：请在项目根目录运行 .venv/Scripts/python -m pip install -r backend/requirements-ocr.txt（macOS/Linux 用 .venv/bin/python），再重启服务。';
+
+  function syncOcrEntry() {
+    var input = $('chat-image');
+    if (!input) return;
+    var label = $('chat-image-label');
+    var available = !(state.health && state.health.ocr_available === false);
+    input.disabled = !available;
+    label.classList.toggle('disabled', !available);
+    label.title = available ? '' : OCR_INSTALL_HINT;
+    $('chat-image-text').textContent = available ? '导入长截图（可多选）' : '导入长截图（未装 OCR 依赖）';
   }
 
   async function selectContact(id) {
@@ -1435,6 +1449,7 @@ bindMetricTooltip(label, metricKey, metric);
     try {
       var data = await api('/api/health');
       state.health = data;
+      syncOcrEntry();
       $('footer-status').textContent = data.ai_available
         ? (data.ai_verified ? '云端 AI 已就绪并已验证 · ' + data.ai_model : '云端 AI 已就绪，尚未验证 · ' + data.ai_model)
         : '仅本地模式 · 云端 AI 未配置';
@@ -1580,6 +1595,13 @@ bindMetricTooltip(label, metricKey, metric);
         await setMessages(parsed.messages);
         say('Excel 已解析。文件不会被保存进档案，请核对「我 / 对方」。');
       });
+    });
+
+    $('chat-image-label').addEventListener('click', function (event) {
+      if (state.health && state.health.ocr_available === false) {
+        event.preventDefault();
+        say(OCR_INSTALL_HINT, true);
+      }
     });
 
     $('chat-image').addEventListener('change', function () {

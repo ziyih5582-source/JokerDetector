@@ -1,4 +1,6 @@
-# 可选依赖：微信长截图识别（本地 OCR）。
-# 不安装也不影响其余功能，只是 /api/profiles/parse-image 会返回 503。
-# 安装：.venv/Scripts/python -m pip install -r backend/requirements-ocr.txt
+# Optional dependency: WeChat long-screenshot import (local OCR, offline).
+# Without it, POST /api/profiles/parse-image returns 503 and the front-end
+# disables the "import long screenshot" entry; every other feature still works.
+# Install (Windows): .venv\Scripts\python -m pip install -r backend\requirements-ocr.txt
+# Install (macOS/Linux): .venv/bin/python -m pip install -r backend/requirements-ocr.txt
 rapidocr-onnxruntime>=1.4,<2

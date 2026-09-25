@@ -28,7 +28,7 @@
 首页最前面是一张思源湖水彩画：原图 `assets/pictures/交大思源湖.png` 不入库，网页用的是由它导出的 `frontend/img/siyuan-lake.jpg`，另有一张模糊压暗的 `frontend/img/siyuan-lake-soft.jpg` 作为整站的远景水色；首页中段还有一条用它做的「卷中题记」水色横带。湖面 canvas（`#pond-canvas`）只在首页之外的页面可见，点纸面空白处即可撒一把食喂鱼，首页放的是画卷、不放鱼。设计上仍然只有细墨线 + 浓淡墨色 + 文字，没有任何方框按钮。
 
 **4. 后端文案随之对齐。**
-未配置云端 AI 时的提示现在指向「设置」页（不再叫「墨设」），`backend/tests/test_fisherman.py` 的断言也一并改成「设置」；测试仍是 **111 项**，全部通过。
+未配置云端 AI 时的提示现在指向「设置」页（不再叫「墨设」），`backend/tests/test_fisherman.py` 的断言也一并改成「设置」；测试仍是 **112 项**，全部通过。
 
 ### 更早：目录按前后端分离重组
 
@@ -89,7 +89,7 @@ python -m venv .venv
 .venv/bin/python -m pip install -r backend/requirements-ocr.txt
 ```
 
-不装也不影响其它功能，只是「导入长截图」会提示未安装 OCR 依赖（返回 503）。
+不装也不影响其它功能；此时「导入长截图」入口会**置灰**，点它会提示安装命令（接口本身也会返回 503）。
 
 ### 启动
 
@@ -158,7 +158,7 @@ DEEPSEEK_MODEL=deepseek-chat
 │   │   └── 📁 api/
 │   │       ├── 📄 deps.py          # analyzer 单例与本机档案库
 │   │       └── 📁 routes/          # system / analysis / profiles / fisherman，由 api_router 聚合
-│   ├── 📁 tests/                   # 111 项自动化测试
+│   ├── 📁 tests/                   # 112 项自动化测试
 │   ├── 📄 pyproject.toml           # pytest 与 ruff 配置
 │   ├── 📄 requirements.txt
 │   └── 📄 requirements-ocr.txt     # 可选：长截图识别依赖（rapidocr-onnxruntime）

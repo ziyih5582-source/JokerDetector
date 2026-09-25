@@ -13,6 +13,7 @@ import 本模块并测试版面重建逻辑。
 from __future__ import annotations
 
 import base64
+import importlib.util
 import io
 import re
 from typing import Any
@@ -58,6 +59,14 @@ THUMB_MAX_SIDE = 480         # 表情/图片随消息返回的缩略图最长边
 
 class OCRUnavailable(RuntimeError):
     """OCR 依赖缺失或引擎无法初始化。"""
+
+
+def available() -> bool:
+    """是否装有 OCR 依赖（只看包在不在，不加载模型，供 /api/health 使用）。"""
+    try:
+        return importlib.util.find_spec("rapidocr_onnxruntime") is not None
+    except (ImportError, ValueError):
+        return False
 
 
 _TIME_ONLY = r"\d{1,2}:\d{2}(?::\d{2})?"
