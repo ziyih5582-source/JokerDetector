@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>交心 · 思源湖研究所 — 聊天记录情感分析与人物档案</title>
+<meta name="description" content="交心 · 思源湖研究所：把一段聊天交给思源湖，算法量投入，AI 读语气，湖畔的钓翁陪你把它想明白。上海交通大学工程学导论课程项目。">
+<meta name="theme-color" content="#f4f0e6">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="stylesheet" href="/static/css/ink.css">
+</head>
+<body data-view="pond">
+
+<!-- 远景水色：思源湖水彩的极淡一层，整站都泡在湖气里 -->
+<div class="lake" id="lake-backdrop" aria-hidden="true"></div>
+<!-- 近景游鱼：只在首页之外的水面上出现，点一下就能投食 -->
+<canvas id="pond-canvas" aria-hidden="true"></canvas>
+<div class="veil" aria-hidden="true"></div>
+
+<div class="scroll">
+  <header class="masthead">
+    <a class="mark" href="/" data-go="pond" aria-label="交心 · 思源湖研究所，回到首页">
+      <span>交</span><span>心</span>
+    </a>
+    <div class="masthead-title">
+      <h1>交心 · 思源湖研究所</h1>
+      <p>上海交通大学 · 把一段聊天投进湖里，量一量、记下来、说出口</p>
+    </div>
+    <nav class="ledger" id="nav" aria-label="主要功能">
+      <span class="ledger-here" id="nav-here" aria-live="polite"></span>
+      <button type="button" data-go="pond" title="首页：思源湖与上手三步">首页</button>
+      <i aria-hidden="true"></i>
+      <button type="button" data-go="flow" title="粘贴聊天记录，得到情感分析与人物档案">谈心分析</button>
+      <i aria-hidden="true"></i>
+      <button type="button" data-go="fisherman" title="和 AI 钓翁聊一聊，可以带上某个人的档案">找钓翁聊聊</button>
+      <i aria-hidden="true"></i>
+      <button type="button" data-go="book" title="按人保存喜好与观察，可以修正、导出、删除">人物档案</button>
+      <i aria-hidden="true"></i>
+      <button type="button" data-go="theory" title="心理学理论与效应，带出处与证据强度">心理学依据</button>
+      <i aria-hidden="true"></i>
+      <button type="button" data-go="guide" title="第一次用？一分钟看懂全部功能与隐私边界">使用说明</button>
+      <i aria-hidden="true"></i>
+      <button type="button" data-go="config" title="云端 AI 状态、湖面动画与背景音乐">设置</button>
+    </nav>
+  </header>
+
+  <main class="stage">
+
+    <!-- ==================================================================
+         首页 · 思源湖
+         画卷在最前：远景水色 + 湖上石碑，下面接题跋（名称与上手三步）。
+         ================================================================== -->
+    <section class="view" data-view="pond">
+      <figure class="hero">
+        <img class="hero-art" src="/static/img/siyuan-lake.jpg"
+             alt="交大思源湖水彩写生：湖畔垂柳、路灯、喷泉与红砖教学楼，右侧立着刻有「思源湖」的石碑"
+             decoding="async" fetchpriority="high">
+        <span class="hero-seal" aria-hidden="true">饮水<br>思源</span>
+      </figure>
+
+      <div class="hero-copy">
+        <p class="hero-kicker">上海交通大学 · 思源湖</p>
+        <h2 class="hero-title">交心<span aria-hidden="true">·</span>思源湖研究所</h2>
+        <p class="hero-sub">
+          一套给交大人的「谈心 + 自查」小机制：把一段聊天交给湖面，算法量你投入了多少，
+          AI 读语气，钓翁陪你把没想明白的地方说出口。三件事一次做完——量一量、记下来、说出口。
+        </p>
+        <div class="hero-actions">
+          <button type="button" class="seal-btn" data-go="flow">开始谈心分析</button>
+          <button type="button" class="line-btn" data-go="guide">第一次用？先看使用说明</button>
+        </div>
+        <p class="hero-note">不需要 API Key 也能完整体验；聊天数据默认只留在本机。往里走，水面上点一下还能喂鱼。</p>
+      </div>
+
+      <!-- 三步上手：细线分隔的文字栏，不用方框 -->
+      <section class="start">
+        <h3 class="block-title"><span>始</span>三步就能用</h3>
+        <ol class="start-steps">
+          <li>
+            <span class="step-idx">一</span>
+            <h4>把聊天粘进来</h4>
+            <p>每行「发言者：内容」即可，也可以直接导入微信导出的 Excel。手边没有记录，就用内置的两个虚构示例先跑一遍。</p>
+            <button type="button" class="line-btn quiet" data-go="flow">去粘贴</button>
+          </li>
+          <li>
+            <span class="step-idx">二</span>
+            <h4>告诉湖面哪个是你</h4>
+            <p>点「辨认说话的人」，核对哪一边是你、哪一边是对方；顺手看一眼脱敏预览，就知道什么会被发出去。</p>
+            <button type="button" class="line-btn quiet" data-go="flow">去核对</button>
+          </li>
+          <li>
+            <span class="step-idx">三</span>
+            <h4>看水纹，也留下笔记</h4>
+            <p>结果页同时给出分数、五维墨线、双方比对，以及对方说过什么、有哪些互相矛盾的地方。</p>
+            <button type="button" class="line-btn quiet" data-go="guide">先了解结果怎么看</button>
+          </li>
+        </ol>
+      </section>
+
+      <!-- 三件事：量一量 / 记下来 / 说出口 -->
+      <section class="triad">
+        <h3 class="block-title"><span>事</span>这个研究所做的三件事</h3>
+        <div class="triad-list">
+          <article>
+            <h4>量一量 · 谈心分析</h4>
+            <p>五维相对指标 + logistic 曲线，把你在这段关系里的投入折算成 0–100 分，并给出双方比对与依据。分数只描述你交上来的这一段聊天。</p>
+            <button type="button" class="line-btn quiet" data-go="flow">开始分析</button>
+          </article>
+          <article>
+            <h4>记下来 · 人物档案</h4>
+            <p>把对方明确说过的喜好、以及一句句可核查的沟通观察，按人存成档案；正反冲突并存，随时可以人工修正、导出或删除。档案在本机加密保存。</p>
+            <button type="button" class="line-btn quiet" data-go="book">翻人物档案</button>
+          </article>
+          <article>
+            <h4>说出口 · 找钓翁聊聊</h4>
+            <p>不想分析、只想有人听着，就去找思源湖畔的钓翁。可以选定一个人，让 TA 的脱敏档案先被读过，建议就会贴着你这段关系，而不是泛泛安慰。</p>
+            <button type="button" class="line-btn quiet" data-go="fisherman">去找钓翁</button>
+          </article>
+        </div>
+      </section>
+
+      <!-- 卷中题记：一条思源湖的水色横带，把两段文字轻轻隔开 -->
+      <figure class="band">
+        <p>湖面平静，才照得见人；话说出口，才知道自己在乎什么。</p>
+      </figure>
+
+      <!-- 边界与支持：把「这不是什么」和真实求助入口放在显眼处 -->
+      <section class="support">
+        <h3 class="block-title"><span>界</span>它是什么，不是什么</h3>
+        <p>
+          这是一个课程作业里的小工具，用来自我觉察与整理，<b>不是心理测量、不是诊断，也不能替代心理咨询或医疗</b>。
+          分数和标签都只反映你交上来的那段聊天，不构成对任何人的判断。
+        </p>
+        <h4 class="support-title">如果此刻真的很难</h4>
+        <ul class="support-list">
+          <li>学校心理健康教育与咨询中心：通过校方公布的渠道预约（在校学生通常免费）。</li>
+          <li>全国统一心理援助热线 <b>12356</b>，24 小时、免费；各地还有本地的心理援助热线。</li>
+          <li>紧急情况请直接拨打 <b>120</b> / <b>110</b>，或立刻联系身边可信任的人。</li>
+        </ul>
+        <p class="note">热线与预约方式以官方公布为准，这里只是把入口放在顺手的地方。</p>
+      </section>
+    </section>
+
+    <!-- ==================================================================
+         谈心分析 · 唯一输入口（分析与建档同时完成）
+         ================================================================== -->
+    <section class="view" data-view="flow">
+      <div class="lede">
+        <span class="eyebrow">谈心分析 · 第一步</span>
+        <h2>把一段聊天投进湖里</h2>
+        <p>每行「发言者：内容」，或导入微信导出的 Excel。一次提交同时得到情感分析与人物档案更新；不选档案对象就只看水纹、不落一笔。</p>
+      </div>
+
+      <ol class="flow-steps" aria-hidden="true">
+        <li class="on">① 粘贴记录</li>
+        <li>② 辨认说话的人</li>
+        <li>③ 选择是否建档</li>
+        <li>④ 开始分析</li>
+      </ol>
+
+      <div class="grid">
+        <div class="col-main">
+          <label class="field-label" for="chat-text">聊天记录</label>
+          <textarea id="chat-text" rows="8" spellcheck="false"
+            placeholder="我：周末有什么安排？&#10;小林：我喜欢徒步&#10;我：那一起去吧"></textarea>
+
+          <div class="line-actions">
+            <button type="button" id="parse-text" class="line-btn">辨认说话的人</button>
+            <label class="line-btn" for="chat-file">导入 Excel
+              <input id="chat-file" type="file" accept=".xlsx,.xls" hidden>
+            </label>
+            <button type="button" id="sample-one" class="line-btn quiet">填入示例一</button>
+            <button type="button" id="sample-two" class="line-btn quiet">填入示例二</button>
+            <button type="button" id="clear-chat" class="line-btn quiet">清空</button>
+            <span id="message-count" class="note"></span>
+          </div>
+
+          <div id="speaker-panel" hidden>
+            <div class="two-up">
+              <div>
+                <label class="field-label" for="self-speaker">我（自己）</label>
+                <select id="self-speaker"></select>
+              </div>
+              <div>
+                <label class="field-label" for="other-speaker">对方（要建档的人）</label>
+                <select id="other-speaker"></select>
+              </div>
+            </div>
+            <details class="preview">
+              <summary>核对脱敏预览 <span id="preview-count" class="note"></span></summary>
+              <p class="note">只有勾选云端 AI 时，下面这些片段才会发出去；档案只留脱敏引用。自动脱敏认不出所有隐私，请自行删去不愿处理的内容。</p>
+              <pre id="redacted-preview"></pre>
+            </details>
+          </div>
+
+          <h3 class="block-title"><span>例</span>手边没有记录？用示例试试</h3>
+          <div id="demo-list" class="demo-list"></div>
+        </div>
+
+        <aside class="col-side">
+          <h3 class="block-title"><span>册</span>这段聊天记在谁名下</h3>
+          <select id="contact-select"></select>
+          <div class="line-actions">
+            <input id="contact-name" placeholder="新的称呼" maxlength="60" autocomplete="off">
+            <button type="button" id="create-contact" class="line-btn quiet">新建档案</button>
+          </div>
+          <p class="note" id="archive-note"></p>
+
+          <h3 class="block-title"><span>选</span>保存与云端选项</h3>
+          <label class="check"><input type="checkbox" id="save-consent"><span>我确认聊天双方与档案对象的对应关系，并同意在本机保存脱敏后的档案依据。</span></label>
+          <label class="check"><input type="checkbox" id="use-ai"><span>本次使用云端 AI：把预览里的脱敏片段发给我配置的服务。</span></label>
+          <label class="check"><input type="checkbox" id="include-guidance" checked><span>同时生成 AI 情感分析长文（约 1000–2000 字，多一次调用，可能等待两分钟）。</span></label>
+
+          <button type="button" id="run-btn" class="seal-btn wide">开始分析</button>
+          <p class="note" id="ai-status">正在读取服务状态…</p>
+          <p class="note">按下之后结果会出现在「分析结果」一页。没有 API Key 也能用：本地统计与喜好提取全程不联网。</p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ==================================================================
+         分析结果 · 水纹与档案变动
+         ================================================================== -->
+    <section class="view" data-view="result">
+      <div class="verdict">
+        <span class="eyebrow" id="source-note">分析结果 · 水纹</span>
+        <div class="verdict-line">
+          <div class="score-wrap">
+            <span class="score" id="score-number">0</span>
+            <span class="score-unit">/ 100</span>
+          </div>
+          <div class="verdict-text">
+            <h2 id="verdict-label"></h2>
+            <p id="score-subtitle"></p>
+          </div>
+          <div class="seal-type" id="type-seal" hidden><span id="type-seal-text"></span></div>
+        </div>
+      </div>
+
+      <section class="block" id="type-block" hidden>
+        <h3 class="block-title"><span>型</span>类型印章</h3>
+        <p class="big-quote" id="type-desc"></p>
+        <p class="note" id="type-suggestion"></p>
+        <p class="keywords" id="type-keywords"></p>
+      </section>
+
+      <section class="block">
+        <h3 class="block-title"><span>画</span>五维墨线</h3>
+        <p class="note">每个维度先算成「你比对方重多少」的相对值（−1 ～ +1），再按权重合成总分。把鼠标停在条目上可以看到算法细节。</p>
+        <div class="ink-chart"><svg id="radar" viewBox="0 0 320 300" role="img" aria-label="五维倾向墨线图"></svg></div>
+        <ul class="metric-list" id="metric-list"></ul>
+      </section>
+
+      <section class="block">
+        <h3 class="block-title"><span>比</span>双方比对</h3>
+        <div class="compare" id="compare"></div>
+      </section>
+
+      <section class="block" id="profile-result" hidden>
+        <h3 class="block-title"><span>册</span>人物档案变动</h3>
+        <div id="profile-result-body"></div>
+      </section>
+
+      <section class="block" id="guidance-block" hidden>
+        <h3 class="block-title"><span>书</span><span id="guidance-title">AI 情感分析长文</span></h3>
+        <div class="long-text" id="guidance-content"></div>
+      </section>
+
+      <div class="line-actions">
+        <button type="button" class="line-btn" data-go="flow">再分析一段</button>
+        <button type="button" class="line-btn quiet" id="share-btn">导出为图片</button>
+        <button type="button" class="line-btn quiet" id="goto-book-from-result">查看人物档案</button>
+        <button type="button" class="line-btn quiet" data-go="fisherman">和钓翁说说</button>
+      </div>
+    </section>
+
+    <!-- ==================================================================
+         找钓翁聊聊 · 情感倾诉
+         ================================================================== -->
+    <section class="view" data-view="fisherman">
+      <div class="lede">
+        <span class="eyebrow">找钓翁聊聊</span>
+        <h2>思源湖边坐着一个人，可以问问他</h2>
+        <p>聊感情上的事不必先组织好语言。可以只是随便说说，也可以选定一个人，让钓翁先看过 TA 的档案再开口——那样的建议会贴着你这段关系，而不是泛泛的安慰。</p>
+      </div>
+
+      <div class="grid grid-roster">
+        <aside class="col-side">
+          <button type="button" id="fisher-new" class="line-btn">＋ 新对话</button>
+          <div id="fisher-list" class="roster"></div>
+
+          <h3 class="block-title"><span>谁</span>这次想聊谁</h3>
+          <select id="fisher-contact" aria-label="选择要谈的人"></select>
+          <label class="check">
+            <input type="checkbox" id="fisher-use-profile">
+            <span>把 TA 的档案作为背景交给 AI，让建议落在具体的人身上。</span>
+          </label>
+          <details class="preview" id="fisher-context-box" hidden>
+            <summary>查看将发送的档案内容 <span id="fisher-context-count" class="note"></span></summary>
+            <pre id="fisher-context"></pre>
+          </details>
+          <p class="note" id="fisher-privacy">对话只留在这个标签页的内存里：刷新即消失，不写入档案、不写入数据库。你说的话会发给你配置的 AI 服务，发送前在本机做基础脱敏（电话、邮箱、证件号等），但脱敏认不出所有隐私。</p>
+        </aside>
+
+        <div class="col-main">
+          <div id="fisher-thread" class="thread"></div>
+          <div class="compose">
+            <label class="field-label" for="fisher-input">说给钓翁</label>
+            <textarea id="fisher-input" rows="3" placeholder="想到哪儿说到哪儿…（⌘ / Ctrl + Enter 发送）"></textarea>
+            <div class="line-actions">
+              <button type="button" id="fisher-send" class="seal-btn">发送</button>
+              <span class="note" id="fisher-status"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================================================================
+         人物档案
+         ================================================================== -->
+    <section class="view" data-view="book">
+      <div class="lede">
+        <span class="eyebrow">人物档案</span>
+        <h2>每聊一次，多一点了解</h2>
+        <p>记下对方明确说过的喜好，也给每一条推测留出修正的余地。同一段聊天重复投入不会重复计数。</p>
+      </div>
+
+      <div class="grid grid-roster">
+        <aside class="col-side">
+          <label class="field-label" for="contact-search">搜索</label>
+          <input id="contact-search" type="search" placeholder="按称呼筛选" autocomplete="off">
+          <div id="contact-list" class="roster"></div>
+          <p class="note">档案在本机加密保存（<code>data/private/</code>）。密钥也在同一台机器上，无法防御已获得本机权限的人；迁移备份需同时保留数据库与密钥。</p>
+        </aside>
+
+        <div class="col-main">
+          <div id="no-contact" class="empty">
+            <p>还没有翻开任何一页。</p>
+            <p class="note">先在左侧「新建档案」，或到「谈心分析」里投入一段聊天并选定档案对象。</p>
+          </div>
+
+          <div id="contact-workspace" hidden>
+            <div class="roster-head">
+              <h3 id="profile-name"></h3>
+              <p class="note" id="profile-meta"></p>
+            </div>
+            <div class="tally">
+              <div><b id="fact-count">0</b><span>档案条目</span></div>
+              <div><b id="review-count">0</b><span>待核实</span></div>
+              <div><b id="batch-count">0</b><span>次分析</span></div>
+              <div><b id="revision">0</b><span>版本</span></div>
+            </div>
+            <div class="line-actions">
+              <button type="button" id="goto-flow" class="line-btn">为 TA 分析一段聊天</button>
+              <button type="button" id="export-contact" class="line-btn quiet">导出为 JSON</button>
+              <button type="button" id="delete-contact" class="line-btn danger">删除此人</button>
+            </div>
+
+            <h3 class="block-title"><span>好</span>喜好与观察</h3>
+            <p class="note">「原话提取」也可能有语境偏差；AI 观察一律待核实，不代表完整性格。</p>
+            <div id="facts" class="facts"></div>
+
+            <h3 class="block-title"><span>迹</span>分析记录</h3>
+            <div id="history" class="history"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================================================================
+         心理学依据（内容由 theory.js 提供）
+         ================================================================== -->
+    <section class="view" data-view="theory">
+      <div class="lede">
+        <span class="eyebrow">心理学依据</span>
+        <h2>关系背后的几副镜片</h2>
+        <p>这里整理了心理学里若干被反复研究过的理论与效应，每一条都写明提出者、年份与出处，并指出它和本项目里哪个指标有关。它们是理解关系的镜片，不是给你或给对方下的判决书。</p>
+      </div>
+      <nav class="toc" id="theory-toc" aria-label="理论目录"></nav>
+      <div id="theory-body"></div>
+      <h3 class="block-title"><span>慎</span>这些理论不能用来做什么</h3>
+      <ul class="caveats" id="theory-caveats"></ul>
+      <h3 class="block-title"><span>源</span>参考资料</h3>
+      <div class="refs" id="theory-refs"></div>
+      <section class="block">
+        <p class="note">本页内容由 <code>frontend/js/theory.js</code> 提供，欢迎自行增补或修正；每条都建议保留可核查的出处。</p>
+      </section>
+    </section>
+
+    <!-- ==================================================================
+         使用说明
+         ================================================================== -->
+    <section class="view" data-view="guide">
+      <div class="lede">
+        <span class="eyebrow">使用说明</span>
+        <h2>这个研究所到底能做什么</h2>
+        <p>一句话：把一段聊天变成两份东西——一份量化的关系画像，一份关于对方的笔记。这一页讲清每处怎么点、数字怎么来的、什么会被发到云端。</p>
+      </div>
+
+      <nav class="toc" id="guide-toc" aria-label="使用说明目录"></nav>
+
+      <h3 class="block-title"><span>一</span>一分钟上手</h3>
+      <ol class="steps" id="guide-steps">
+        <li>在顶部点「谈心分析」，把聊天粘进文本框（每行「发言者：内容」），或导入微信导出的 Excel，然后点「辨认说话的人」。</li>
+        <li>核对「我（自己）」和「对方」；想让湖面记住这个人，就在右栏选一个档案、或新建一个，并勾选第一项确认。</li>
+        <li>点「开始分析」。结果页会同时给出<b>水纹</b>（分数、类型印章、五维墨线、双方比对）与<b>档案变动</b>（新增了哪几条喜好、有没有互相冲突）。</li>
+        <li>只想分析、不留痕迹，就把「这段聊天记在谁名下」留成「不建档」。想找人说说话，去「找钓翁聊聊」。</li>
+      </ol>
+      <p class="note">没有 API Key 也能走完整个流程：解析、统计、脱敏、喜好提取全在本机完成，一次网络请求都不会发出。</p>
+
+      <h3 class="block-title"><span>二</span>这是一套什么样的"谈心机制"</h3>
+      <p class="note">三件事按顺序做，正好对应三个页面；只做其中一件也成立。</p>
+      <div class="panels">
+        <div class="panel">
+          <h4>① 量一量 · 谈心分析</h4>
+          <p>把模糊的「我是不是付出太多」变成可比较的数字：五个维度的相对值合成 0–100 分，并给出双方比对。它的作用是把感觉说清楚，而不是给你定性。</p>
+        </div>
+        <div class="panel">
+          <h4>② 记下来 · 人物档案</h4>
+          <p>关系里的失望常常来自「记错了」。档案按人保存对方明确说过的喜好与可核查的观察，正反冲突并存，随时可修正——它帮你看清这段关系，而不是替对方画像。</p>
+        </div>
+        <div class="panel">
+          <h4>③ 说出口 · 找钓翁聊聊</h4>
+          <p>有些事需要有人听着。钓翁不做诊断、不贴标签、不替你决定分手或复合，只帮你把情绪接住、把选项看清。真到了需要专业帮助的时候，下面有更合适的入口。</p>
+        </div>
+      </div>
+
+      <h3 class="block-title"><span>三</span>七个页面各管什么</h3>
+      <div class="panels" id="guide-panels">
+        <div class="panel">
+          <h4>首页</h4>
+          <p>入口。一张思源湖水彩，下面写着三步上手；点纸面之外的地方不会有任何副作用，安心乱点。</p>
+        </div>
+        <div class="panel">
+          <h4>谈心分析</h4>
+          <p>唯一的输入口。粘贴文本或导入 Excel、辨认说话的人、核对脱敏预览、决定这次是否写进档案、是否调用云端 AI。示例按钮可以先用虚构内容跑一遍。</p>
+        </div>
+        <div class="panel">
+          <h4>分析结果</h4>
+          <p>结果页。给出分数与判定、类型印章、五维墨线、双方比对，以及本次的档案变动与可选的 AI 情感长文。可以「导出为图片」留档。</p>
+        </div>
+        <div class="panel">
+          <h4>找钓翁聊聊</h4>
+          <p>和 AI 聊感情问题。可以只随便聊，也可以选定一个人、把 TA 的脱敏档案作为背景交给 AI。随时可「新对话」，对话只存在浏览器内存里。</p>
+        </div>
+        <div class="panel">
+          <h4>人物档案</h4>
+          <p>按人累积「喜好」与「沟通观察」，每条都保留脱敏依据，正反冲突并存，可以人工确认、修正、删除，也可以导出 JSON。档案在本机加密保存。</p>
+        </div>
+        <div class="panel">
+          <h4>心理学依据</h4>
+          <p>依恋理论、爱情三角、投资模型等经典理论，每条都带出处与证据强度，并说明它对应本项目里的哪个指标。用来理解关系，不用来给人贴标签。</p>
+        </div>
+        <div class="panel">
+          <h4>设置</h4>
+          <p>查看云端 AI 是否就绪（密钥放在服务端项目根目录 <code>.env</code> 的 <code>DEEPSEEK_API_KEY</code> 里，页面只显示状态），以及湖面动画、撒食与背景音乐。</p>
+        </div>
+      </div>
+
+      <h3 class="block-title"><span>四</span>分数是怎么算出来的</h3>
+      <div id="guide-score"></div>
+      <h3 class="block-title"><span>五</span>五维各看什么</h3>
+      <div class="rows" id="guide-metrics"></div>
+      <h3 class="block-title"><span>六</span>判定区间</h3>
+      <div class="rows" id="guide-levels"></div>
+      <p class="note">分数只描述所提交的这一段聊天，会随片段长短与选谁当「我」而变。桌面版 <code>legacy/desktop/v5.py</code> 与网页版用的是同一套算法（五维 Z 指标 + logistic，同为 0–100 分），只是判决树的写法略有不同；真正过时的「比率制」（0.2 / 0.5 / 1.0 / 2.0 分档）属于更早的 v1 / v3 / v4.x，那些代码已随 <code>archive/</code> 一并删除。</p>
+
+      <h3 class="block-title"><span>七</span>四种类型</h3>
+      <p class="note" id="guide-type-rule"></p>
+      <div class="types" id="guide-types"></div>
+
+      <h3 class="block-title"><span>八</span>什么留在本地，什么会发出去</h3>
+      <div class="panels">
+        <div class="panel">
+          <h4>只在本机</h4>
+          <p>Excel 解析、统计与打分、手机号/邮箱等基础脱敏、喜好提取、档案加密存储（<code>data/private/</code>）。完整聊天内容不会进入档案库，也不写进数据库。</p>
+        </div>
+        <div class="panel">
+          <h4>勾选后才走网络</h4>
+          <p>「本次使用云端 AI」——发送脱敏后的片段去提取喜好与生成情感长文；「找钓翁聊聊」——发送你说的话，以及你勾选的那个人的脱敏档案背景。两处都会在页面上先给你看要发什么。</p>
+        </div>
+        <div class="panel">
+          <h4>从不保存</h4>
+          <p>钓翁的对话只留在当前标签页内存里，刷新即消失，服务端不落盘。云端密钥也只留在服务端（<code>.env</code> 或同名环境变量），不会下发到浏览器。</p>
+        </div>
+      </div>
+
+      <h3 class="block-title"><span>九</span>输入格式与上限</h3>
+      <div class="rows" id="guide-limits"></div>
+
+      <h3 class="block-title"><span>十</span>常见问题</h3>
+      <div class="faq" id="guide-faq">
+        <details><summary>没有 API Key 能用吗？</summary><p>能。除了「找钓翁聊聊」必须联网，其它功能都能离线完成，包括喜好提取与档案管理。</p></details>
+        <details><summary>为什么 AI 一直不可用？</summary><p>去「设置」看状态：网页版不需要你填 Key，密钥统一放在服务端项目根目录的 <code>.env</code> 的 <code>DEEPSEEK_API_KEY</code> 里。改完 <code>.env</code> 点「重新加载配置」，再点「测试连接」；只有真实请求成功才会标为已验证，失败时页面会给出具体原因（密钥、余额、模型 ID、限流、超时等）。</p></details>
+        <details><summary>为什么两次分析的分数不一样？</summary><p>分数只反映你这一次提交的那段聊天。片段越短、双方越不对等，分数越容易走极端；换一个片段、甚至把「我」和「对方」换了，都会变。</p></details>
+        <details><summary>为什么类型会跳来跳去？</summary><p>类型取的是五维里数值最高的那一项，不同片段的「最高项」很可能是不同的维度，所以类型会变。它更像一句总结，不是人格标签。</p></details>
+        <details><summary>为什么没有认出任何喜好？</summary><p>本地提取只认明确的第一人称日常喜好（「我喜欢徒步」这类）。复杂表达、反讽、生日与关键事件都不在覆盖范围内，宁可留白也不乱猜。想让 AI 帮忙推断，就勾选云端 AI。</p></details>
+        <details><summary>重复导入同一段聊天会怎样？</summary><p>同一段脱敏片段按指纹去重：档案不会重复记账，也不会重复调用云端。除非上次 AI 失败，或者你这次额外勾选了生成情感长文。</p></details>
+        <details><summary>AI 长文没出来？</summary><p>结果页会显示具体原因，本地统计仍然保留。常见原因是超时（长文有独立的 90 秒超时）、额度不足或模型 ID 与服务商不匹配。</p></details>
+        <details><summary>这些数字能当诊断用吗？</summary><p>不能。这是一个课程作业里的趣味算法，标签和分数都不是心理测量工具，也不能代表任何人的感情或人格。如果你正处在持续的痛苦里，请去看「首页」最下面的求助入口。</p></details>
+      </div>
+
+      <p class="disclaimer">本项目仅供课程学习与娱乐，请勿用于真实情感决策。如果你正处在持续的痛苦里，寻求现实中的专业帮助比任何算法都重要。</p>
+    </section>
+
+    <!-- ==================================================================
+         设置
+         ================================================================== -->
+    <section class="view" data-view="config">
+      <div class="lede">
+        <span class="eyebrow">设置</span>
+        <h2>云端 AI、湖面与配乐</h2>
+        <p>云端 AI 已经由项目统一配置，你不需要填写任何 API Key。本地算法永远可用；云端只在你勾选后才会收到脱敏片段。</p>
+      </div>
+
+      <h3 class="block-title"><span>云</span>云端 AI 状态</h3>
+      <div class="form-narrow">
+        <p class="note" id="ai-config-state">正在读取配置…</p>
+        <div class="line-actions">
+          <button type="button" id="ai-test-btn" class="line-btn">测试连接</button>
+          <button type="button" id="ai-reload-btn" class="line-btn quiet">重新加载配置</button>
+          <span class="note" id="ai-config-msg"></span>
+        </div>
+        <p class="note">验证会向已配置的服务发送一段固定的虚构示例，会产生少量用量，不会发送你的聊天。配置来自项目根目录 <code>.env</code> 里的 <code>DEEPSEEK_API_KEY</code>（也支持同名环境变量）；改完 <code>.env</code> 后点「重新加载配置」即可生效。密钥只留在服务端，不会下发到浏览器。</p>
+      </div>
+
+      <h3 class="block-title"><span>湖</span>湖面与动画</h3>
+      <div class="line-actions">
+        <button type="button" id="pond-toggle" class="line-btn quiet">暂停湖面动画</button>
+        <button type="button" id="pond-scatter" class="line-btn quiet">撒一把鱼食</button>
+      </div>
+      <p class="note">首页之外的水面上都养着鱼：点任意空白处置食，附近的鱼会游过来吃掉。</p>
+
+      <h3 class="block-title"><span>乐</span>背景音乐</h3>
+      <div class="line-actions music-line">
+        <button type="button" id="music-toggle-btn" class="line-btn quiet">▶ 播放</button>
+        <span id="music-track-name" class="note">未选择曲目（判定后自动配乐）</span>
+        <input type="range" id="music-volume" min="0" max="100" value="30" aria-label="音量">
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="colophon">
+    <span class="colophon-motto">饮水思源 · 交心方能知心</span>
+    <i aria-hidden="true"></i>
+    <span id="footer-status">正在读取服务状态…</span>
+    <i aria-hidden="true"></i>
+    <span>上海交通大学 · 工程学导论课程项目</span>
+    <i aria-hidden="true"></i>
+    <span>仅供课程学习与娱乐，不是诊断工具</span>
+  </footer>
+</div>
+
+<div class="loading" id="loading" hidden>
+  <div class="loading-ink"><span></span></div>
+  <p id="loading-text">研墨中…</p>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<dialog id="edit-dialog">
+  <form id="edit-form">
+    <h2>修正这一条</h2>
+    <p class="note">修正后会标注「人工修正」，之后的自动提取只补依据，不会覆盖你写的描述。</p>
+    <label class="field-label" for="edit-text">修正内容</label>
+    <textarea id="edit-text" maxlength="200" rows="4" required></textarea>
+    <div class="line-actions">
+      <button type="button" id="cancel-edit" class="line-btn quiet">取消</button>
+      <button type="submit" class="seal-btn">保存修正</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="delete-dialog">
+  <h2 id="delete-title">确认删除？</h2>
+  <p id="delete-description" class="note"></p>
+  <div class="line-actions">
+    <button type="button" id="cancel-delete" class="line-btn quiet">取消</button>
+    <button type="button" id="confirm-delete" class="seal-btn danger">确认</button>
+  </div>
+</dialog>
+
+<audio id="music-audio" loop preload="none"></audio>
+
+<script src="/static/js/theory.js"></script>
+<script src="/static/js/pond.js"></script>
+<script src="/static/js/ink.js"></script>
+</body>
+</html>

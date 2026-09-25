@@ -158,7 +158,7 @@ env.bak/
 venv.bak/
 
 # 联系人档案（本机加密数据库与密钥，绝不能提交）
-web/private_data/
+data/private/
 profiles.sqlite3
 profile.key
 
@@ -167,14 +167,14 @@ profile.key
 
 # ================== 以下内容刻意不入库（隐私 / 版权）==================
 # 真实私人聊天记录：只在本地保留，绝不要提交
-database/test1.xls
-database/*.xlsx
-# 商业歌曲与类型配图：请自备（README 有说明），不入库
-music/*.mp3
-music/*.MP3
-pictures/*.jpg
-pictures/*.jpeg
-pictures/*.png
+data/samples/test1.xls
+data/samples/*.xlsx
+# 商业歌曲与类型配图：请自备（assets/README.md 有说明），不入库
+assets/music/*.mp3
+assets/music/*.MP3
+assets/pictures/*.jpg
+assets/pictures/*.jpeg
+assets/pictures/*.png
 
 # Spyder project settings
 .spyderproject

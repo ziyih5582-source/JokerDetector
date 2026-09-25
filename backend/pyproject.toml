@@ -1,0 +1,28 @@
+# -*- coding: utf-8 -*-
+# 应用本身不需要打包发布，这里只放工程约定：测试怎么跑、代码怎么检查。
+# 依赖清单见 requirements.txt（pip install -r backend/requirements.txt）。
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+# 让 `pytest` 在 backend/ 目录下直接找到 app 包，测试里不再需要 sys.path 小动作
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+exclude = [".venv", "__pycache__"]
+
+[tool.ruff.lint]
+# 只留下「真会出错」的规则：语法/未定义名/未使用变量 + 常见陷阱。
+# 刻意不启用 isort 与 UP 系列：本项目统一保留 `# -*- coding: utf-8 -*-`
+# 头注释，且大量中文注释与排版习惯不适合被自动改写。
+select = ["E4", "E7", "E9", "F", "B"]
+ignore = [
+    "E501",   # 长行由排版习惯决定，不强制换行
+    "E702",   # 测试里偶用分号并列两句话，不强制拆行
+    "E741",   # 数学公式里用 l 之类的短名更贴近原式
+    "B008",   # FastAPI 的 Depends/Query/File 默认值写法
+    "B904",   # 本项目统一用 HTTPException(...) from None 或直接抛出
+]
