@@ -11,7 +11,7 @@ python -m app.main
 uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
 ```
 
-依赖：`pip install -r requirements.txt`（Python 3.10+）。
+依赖：`pip install -r requirements.txt`（Python 3.10+）。「长截图识别」是可选能力，需要 `pip install -r requirements-ocr.txt`（较重，含 onnxruntime 与 opencv）；不装时该接口返回 503，其余功能不受影响。
 
 ## 分层
 
@@ -43,6 +43,7 @@ uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
 | PATCH | `/api/profiles/contacts/{id}/facts/{fact_id}` | 条目的确认 / 修正 / 删除 |
 | POST | `/api/profiles/preview` | 脱敏与角色归一化预览 |
 | POST | `/api/profiles/parse` | 解析 Excel 为消息数组 |
+| POST | `/api/profiles/parse-image` | 本机 OCR 解析一张或多张长截图（`file` 或重复的 `files`），按选择顺序拼接并去重；返回带时间/类型元数据的消息数组（依赖缺失时 503） |
 | POST | `/api/profiles/contacts/{id}/analyze` | 保留的旧路径，内部走统一流程 |
 | GET | `/api/fisherman/status` | 问钓翁的 AI 状态 |
 | POST | `/api/fisherman/context` | 预览将发送的档案背景（所见即所发） |
@@ -51,6 +52,7 @@ uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
 ## 数据与隐私
 
 - 聊天原文只在请求内使用，不落盘；只有勾选云端选项时才发送脱敏片段。
+- 长截图识别（RapidOCR）全程在本机完成，图片只读入内存、不落盘、不上传。
 - 联系人档案存在项目根的 `data/private/`（可用环境变量 `JOKER_PROFILE_DIR` 覆盖），脱敏后加密；密钥与数据库要一起备份。
 - 服务假定只在本机运行：只接受本机 Host，拒绝跨站写请求，页面走严格 CSP。
 

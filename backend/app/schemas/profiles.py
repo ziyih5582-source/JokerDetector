@@ -18,6 +18,7 @@ class ContactInput(StrictModel):
 class Message(StrictModel):
     speaker: str = Field(min_length=1, max_length=100)
     content: str = Field(min_length=1, max_length=5000)
+    emotion: str | None = Field(default=None, max_length=32)
 
 
 class AnalyzeInput(StrictModel):

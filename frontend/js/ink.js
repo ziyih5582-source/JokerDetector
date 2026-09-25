@@ -15,6 +15,9 @@
     contacts: [],
     profile: null,
     messages: [],
+    ocrUsed: false,
+    ocrAvatars: null,
+    ocrOtherName: null,
     editFactId: null,
     pendingDelete: null,
     selection: 0,
@@ -408,9 +411,16 @@
 
   function clearChat() {
     state.messages = [];
+    state.ocrUsed = false;
+    state.ocrAvatars = null;
+    state.ocrOtherName = null;
     $('chat-text').value = '';
     $('chat-file').value = '';
+    $('chat-image').value = '';
     $('speaker-panel').hidden = true;
+    $('ocr-review').hidden = true;
+    $('ocr-table').replaceChildren();
+    $('ocr-note').textContent = '';
     $('redacted-preview').textContent = '';
     $('message-count').textContent = '';
     $('save-consent').checked = false;
@@ -418,7 +428,11 @@
 
   function payload() {
     return {
-      messages: state.messages,
+      messages: state.messages.map(function (m) {
+        var message = { speaker: m.speaker, content: m.content };
+        if (m.emoji_emotion) message.emotion = m.emoji_emotion;
+        return message;
+      }),
       self_speaker: $('self-speaker').value,
       other_speaker: $('other-speaker').value,
       contact_id: $('contact-select').value || null,
@@ -428,22 +442,42 @@
     };
   }
 
-  async function preview() {
-    $('save-consent').checked = false;
-    $('redacted-preview').textContent = '';
-    // 预览接口只认这几个字段（extra="forbid"），所以不能直接丢整个 payload 过去
-    var body = payload();
-    delete body.contact_id;
-    var data = await api('/api/profiles/preview', { method: 'POST', body: JSON.stringify(body) });
+  function applyPreview(data) {
     $('redacted-preview').textContent = data.messages.map(function (m) {
-      return (m.id + 1) + '. ' + (m.role === 'self' ? '自己' : '对方') + '：' + m.content;
+      var emotion = m.emotion ? '（表情情绪：' + m.emotion + '）' : '';
+      return (m.id + 1) + '. ' + (m.role === 'self' ? '自己' : '对方') + '：' + m.content + emotion;
     }).join('\n');
     $('preview-count').textContent = '· ' + data.messages.length + ' 条';
     syncOptions();
   }
 
+  function previewBody() {
+    // 预览接口只认这几个字段（extra="forbid"），所以不能直接丢整个 payload 过去
+    var body = payload();
+    delete body.contact_id;
+    return body;
+  }
+
+  async function preview() {
+    $('save-consent').checked = false;
+    $('redacted-preview').textContent = '';
+    var data = await api('/api/profiles/preview', { method: 'POST', body: JSON.stringify(previewBody()) });
+    applyPreview(data);
+  }
+
+  // 编辑校对表时用：不打断输入（不 busy、不重置确认），失败就静默等到提交时再说
+  async function softPreview() {
+    if (state.busy) return;
+    try {
+      var data = await api('/api/profiles/preview', { method: 'POST', body: JSON.stringify(previewBody()) });
+      applyPreview(data);
+    } catch (e) { /* 编辑过程中的中间态可以不是合法双人聊天 */ }
+  }
+
   async function setMessages(messages) {
     state.messages = [];
+    state.ocrUsed = false;
+    state.ocrOtherName = null;
     $('speaker-panel').hidden = true;
     var speakers = [];
     messages.forEach(function (m) { if (speakers.indexOf(m.speaker) < 0) speakers.push(m.speaker); });
@@ -465,6 +499,268 @@
     $('message-count').textContent = '已认出 ' + messages.length + ' 条消息，请核对双方';
     await preview();
     $('speaker-panel').hidden = false;
+  }
+
+  // ------------------------------------------------------------ 长截图识别：校对表
+
+  var OCR_KINDS = [['text', '文字'], ['sticker', '表情'], ['image', '图片'], ['voice', '语音']];
+  var OCR_KIND_LABEL = { text: '文字', sticker: '表情', image: '图片', voice: '语音' };
+  var OCR_KIND_DEFAULT = { text: '', sticker: '[表情]', image: '[图片]', voice: '[语音]' };
+  var OCR_EMOTIONS = ['', '开心', '伤心', '生气', '惊讶', '无语', '害羞', '爱心', '疑问'];
+
+  function labeledSelect(options, value, onPick, title) {
+    var select = el('select', 'ocr-select');
+    if (title) select.title = title;
+    options.forEach(function (pair) {
+      var option = el('option', '', pair[1]);
+      option.value = pair[0];
+      select.append(option);
+    });
+    select.value = value;
+    select.addEventListener('change', function () { onPick(select.value); });
+    return select;
+  }
+
+  var previewTimer = null;
+  function schedulePreview() {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(function () { softPreview(); }, 400);
+  }
+
+  function updateOcrCount() {
+    $('message-count').textContent = '已识别 ' + state.messages.length + ' 条，请逐条核对';
+  }
+
+  function updateTimeBadge(foot, message) {
+    var old = foot.querySelector('.ocr-guess');
+    if (old) old.remove();
+    if (message.time_guessed && message.time) foot.append(el('span', 'ocr-guess', '推测'));
+  }
+
+  function isVisualKind(kind) {
+    return kind === 'sticker' || kind === 'image';
+  }
+
+  function kindLabel(kind) {
+    return OCR_KIND_LABEL[kind] || '文字';
+  }
+
+  function timeLabel(message) {
+    if (!message.time) return '时间未知';
+    return message.time + (message.time_guessed ? '（推测）' : '');
+  }
+
+  function speakerOptions() {
+    return [['我', '我'], ['对方', state.ocrOtherName || '对方']];
+  }
+
+  function displayName(speaker) {
+    return speaker === '对方' ? (state.ocrOtherName || '对方') : '我';
+  }
+
+  function emotionOptions(message) {
+    var emotions = OCR_EMOTIONS.slice();
+    if (message.emoji_emotion && emotions.indexOf(message.emoji_emotion) < 0) emotions.push(message.emoji_emotion);
+    return emotions.map(function (emotion) { return [emotion, emotion || '情绪?']; });
+  }
+
+  function applyKindChange(message, value) {
+    var previous = OCR_KIND_DEFAULT[message.kind] || '';
+    message.kind = value;
+    var next = OCR_KIND_DEFAULT[value] || '';
+    if (!message.content || message.content === previous) message.content = next;
+  }
+
+  function openImageView(source) {
+    if (!source) return;
+    $('image-dialog-img').src = source;
+    var dialog = $('image-dialog');
+    if (dialog.showModal) dialog.showModal();
+  }
+
+  function renderOcrReview(warning) {
+    $('ocr-note').textContent = warning ||
+      '识别结果仅供参考：文字默认折叠，点「展开」可改字、切换发言者、修正时间；图片与表情常展开，可直接选情绪并点缩略图查看原图。标「推测」的时间来自最近的一个可见时间分隔。';
+    var table = $('ocr-table');
+    table.replaceChildren();
+    state.messages.forEach(function (message, index) {
+      var visual = isVisualKind(message.kind);
+      var expanded = visual || !!message.open;
+      var row = el('div', 'ocr-row' + (expanded ? '' : ' closed'));
+      row.dataset.kind = message.kind || 'text';
+
+      var head = el('div', 'ocr-row-head');
+      head.append(el('span', 'ocr-index', String(index + 1)));
+      if (visual) {
+        head.append(labeledSelect(speakerOptions(), message.speaker, function (value) {
+          message.speaker = value;
+          schedulePreview();
+        }, '这条是谁说的'));
+        head.append(labeledSelect(OCR_KINDS, message.kind, function (value) {
+          applyKindChange(message, value);
+          renderOcrReview(warning);
+          schedulePreview();
+        }, '消息类型'));
+        head.append(labeledSelect(emotionOptions(message), message.emoji_emotion || '', function (value) {
+          message.emoji_emotion = value;
+          schedulePreview();
+        }, '表情情绪（可自动或手选）'));
+      } else {
+        var summary = el('button', 'ocr-summary');
+        summary.type = 'button';
+        summary.title = expanded ? '点击收起修改' : '点击展开修改';
+        summary.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        summary.append(el('span', 'ocr-speaker', displayName(message.speaker)));
+        summary.append(el('span', 'ocr-meta', kindLabel(message.kind) + ' · ' + timeLabel(message)));
+        summary.append(el('span', 'ocr-preview', message.content));
+        summary.addEventListener('click', function () {
+          message.open = !message.open;
+          renderOcrReview(warning);
+        });
+        head.append(summary);
+      }
+      var remove = el('button', 'line-btn quiet ocr-del', '删除');
+      remove.type = 'button';
+      remove.addEventListener('click', function () {
+        state.messages.splice(index, 1);
+        renderOcrReview(warning);
+        updateOcrCount();
+        schedulePreview();
+      });
+      head.append(remove);
+      row.append(head);
+
+      if (expanded) {
+        var body = el('div', 'ocr-row-body');
+        if (visual && message.image) {
+          var thumb = document.createElement('img');
+          thumb.className = 'ocr-thumb';
+          thumb.src = message.image;
+          thumb.alt = kindLabel(message.kind);
+          thumb.title = '点击查看大图';
+          thumb.addEventListener('click', function () { openImageView(message.image); });
+          body.append(thumb);
+        }
+        if (!visual) {
+          var controls = el('div', 'ocr-row-controls');
+          controls.append(labeledSelect(speakerOptions(), message.speaker, function (value) {
+            message.speaker = value;
+            schedulePreview();
+          }, '这条是谁说的'));
+          controls.append(labeledSelect(OCR_KINDS, message.kind || 'text', function (value) {
+            applyKindChange(message, value);
+            renderOcrReview(warning);
+            schedulePreview();
+          }, '消息类型'));
+          body.append(controls);
+        }
+        var content = document.createElement('input');
+        content.type = 'text';
+        content.className = 'ocr-content';
+        content.value = message.content;
+        content.placeholder = '消息内容';
+        content.addEventListener('input', function () {
+          message.content = content.value;
+          schedulePreview();
+        });
+        body.append(content);
+
+        var foot = el('div', 'ocr-row-foot');
+        var time = document.createElement('input');
+        time.type = 'text';
+        time.className = 'ocr-time';
+        time.value = message.time || '';
+        time.placeholder = '时间（可空）';
+        time.addEventListener('input', function () {
+          message.time = time.value;
+          message.time_guessed = false;
+          updateTimeBadge(foot, message);
+        });
+        foot.append(time);
+        updateTimeBadge(foot, message);
+        if (!visual) {
+          var collapse = el('button', 'line-btn quiet ocr-collapse', '收起');
+          collapse.type = 'button';
+          collapse.addEventListener('click', function () {
+            message.open = false;
+            renderOcrReview(warning);
+          });
+          foot.append(collapse);
+        }
+        body.append(foot);
+        row.append(body);
+      }
+      table.append(row);
+    });
+    $('ocr-review').hidden = false;
+  }
+
+  function renderOcrAvatars() {
+    var box = $('ocr-avatars');
+    var avatars = state.ocrAvatars;
+    if (!avatars) {
+      box.hidden = true;
+      box.replaceChildren();
+      return;
+    }
+    box.replaceChildren();
+    box.append(el('p', 'note', '从截图里读到的两侧头像（仅作参考）：'));
+    var row = el('div', 'ocr-avatar-row');
+    [['other', '对方'], ['self', '我']].forEach(function (pair) {
+      var cell = el('div', 'ocr-avatar');
+      var image = document.createElement('img');
+      image.src = avatars[pair[0]].image;
+      image.alt = pair[1] + '的头像';
+      cell.append(image);
+      cell.append(el('span', '', pair[0] === 'other' ? displayName('对方') : '我'));
+      row.append(cell);
+    });
+    box.append(row);
+    box.append(el('p', 'note', avatars.note));
+    avatars.confirmed = !!avatars.couple_suspected;
+    var label = el('label', 'check');
+    var checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = avatars.confirmed;
+    checkbox.addEventListener('change', function () { avatars.confirmed = checkbox.checked; });
+    label.append(checkbox);
+    label.append(el('span', '', '我确认这两张是情侣头像（仅为展示，不参与评分）'));
+    box.append(label);
+    box.hidden = false;
+  }
+
+  async function setOcrMessages(messages, warning, avatars, otherName) {
+    state.messages = messages.map(function (message) {
+      return {
+        speaker: message.speaker === '我' ? '我' : '对方',
+        content: message.content,
+        time: message.time || '',
+        time_guessed: !!message.time_guessed,
+        kind: message.kind || 'text',
+        emoji_emotion: message.emoji_emotion || '',
+        image: message.image || null,
+        open: false
+      };
+    });
+    state.ocrUsed = true;
+    state.ocrAvatars = avatars || null;
+    state.ocrOtherName = otherName || null;
+    ['self-speaker', 'other-speaker'].forEach(function (id) {
+      var select = $(id);
+      select.replaceChildren();
+      speakerOptions().forEach(function (pair) {
+        var option = el('option', '', pair[1]);
+        option.value = pair[0];
+        select.append(option);
+      });
+    });
+    $('self-speaker').value = '我';
+    $('other-speaker').value = '对方';
+    $('speaker-panel').hidden = false;
+    renderOcrReview(warning);
+    renderOcrAvatars();
+    updateOcrCount();
+    await preview();
   }
 
   async function parseText() {
@@ -505,7 +801,7 @@
     } finally {
       loading(false);
     }
-    renderResult(result, { before: before, contactId: data.contact_id });
+    renderResult(result, { before: before, contactId: data.contact_id, ocr: state.ocrUsed });
     go('result');
     $('save-consent').checked = false;
     if (data.contact_id) {
@@ -556,10 +852,50 @@
 
   // ------------------------------------------------------------ 结果渲染
 
+  function renderOcrSummary() {
+    var block = $('ocr-summary');
+    var body = $('ocr-summary-body');
+    if (!state.ocrUsed || !state.messages.length) {
+      block.hidden = true;
+      return;
+    }
+    body.replaceChildren();
+    body.append(el('p', 'note', '以下是从长截图里识别到的补充信息，仅供核对；它们不参与任何评分。'));
+    if (state.ocrAvatars) {
+      var avatars = state.ocrAvatars;
+      var guess = avatars.couple_suspected ? '疑似情侣头像' : '不像情侣头像';
+      var confirmed = avatars.confirmed ? '你已确认是情侣头像' : '你未确认为情侣头像';
+      body.append(el('p', 'note', '头像相似度 ' + avatars.similarity + '，识别为' + guess + '；' + confirmed + '。'));
+    }
+    state.messages.forEach(function (message, index) {
+      var wrap = el('div', 'ocr-summary-item');
+      var row = el('div', 'row two');
+      row.append(el('span', 'k', (index + 1) + '. ' + displayName(message.speaker)));
+      var time = message.time ? ('时间 ' + message.time + (message.time_guessed ? '（推测）' : '')) : '时间未知';
+      var detail = (OCR_KIND_LABEL[message.kind] || '文字') + ' · ' + time;
+      if (message.emoji_emotion) detail += ' · 情绪 ' + message.emoji_emotion;
+      row.append(el('span', 'v', detail + ' · ' + message.content));
+      wrap.append(row);
+      if (message.image) {
+        var thumb = document.createElement('img');
+        thumb.className = 'ocr-thumb small';
+        thumb.src = message.image;
+        thumb.alt = kindLabel(message.kind);
+        thumb.title = '点击查看大图';
+        thumb.addEventListener('click', function () { openImageView(message.image); });
+        wrap.append(thumb);
+      }
+      body.append(wrap);
+    });
+    block.hidden = false;
+  }
+
   function renderResult(result, meta) {
     // 重复片段只返回档案，不再返回水纹：此时保留上一次的水纹与分享图
     if (result.analysis) state.lastResult = result;
     meta = meta || {};
+    if (meta.ocr) renderOcrSummary();
+    else $('ocr-summary').hidden = true;
     // 兼容：统一接口把水纹放在 analysis 里，这里也容忍直接返回分析对象
     var data = result.analysis || (result.verdict ? result : null);
 
@@ -1226,6 +1562,7 @@ bindMetricTooltip(label, metricKey, metric);
     $('chat-text').addEventListener('input', function () {
       state.messages = [];
       $('speaker-panel').hidden = true;
+      $('ocr-review').hidden = true;
       $('message-count').textContent = '文本变了，请重新辨认';
       $('redacted-preview').textContent = '';
     });
@@ -1242,6 +1579,32 @@ bindMetricTooltip(label, metricKey, metric);
         var parsed = await api('/api/profiles/parse', { method: 'POST', body: form });
         await setMessages(parsed.messages);
         say('Excel 已解析。文件不会被保存进档案，请核对「我 / 对方」。');
+      });
+    });
+
+    $('chat-image').addEventListener('change', function () {
+      var input = this;
+      guard(async function () {
+        var files = Array.prototype.slice.call(input.files || []);
+        if (!files.length) return;
+        clearChat();
+        if (files.length > 20) throw new Error('一次最多 20 张截图，请分几次导入');
+        files.forEach(function (file) {
+          if (file.size > 20 * 1024 * 1024) throw new Error(file.name + ' 超过 20 MB');
+        });
+        var form = new FormData();
+        files.forEach(function (file) { form.append('files', file); });
+        loading(true, files.length > 1
+          ? ['正在读 ' + files.length + ' 张截图…', '把气泡摆回原位…', '接好每一段的缝…']
+          : ['正在读这一长条截图…', '把气泡摆回原位…', '认出说话的人…']);
+        var parsed;
+        try {
+          parsed = await api('/api/profiles/parse-image', { method: 'POST', body: form });
+        } finally {
+          loading(false);
+        }
+        await setOcrMessages(parsed.messages, parsed.warning, parsed.avatars, parsed.other_name);
+        say('已在本机识别 ' + (parsed.image_count || files.length) + ' 张截图，图片不会被保存。请逐条核对校对表，再点「开始分析」。');
       });
     });
 
@@ -1305,6 +1668,10 @@ bindMetricTooltip(label, metricKey, metric);
     });
 
     $('cancel-delete').addEventListener('click', function () { $('delete-dialog').close(); });
+    $('close-image-dialog').addEventListener('click', function () { $('image-dialog').close(); });
+    $('image-dialog').addEventListener('click', function (event) {
+      if (event.target === this) this.close();
+    });
     $('confirm-delete').addEventListener('click', function () {
       guard(async function () {
         var pending = state.pendingDelete;
@@ -1384,6 +1751,8 @@ bindMetricTooltip(label, metricKey, metric);
 
   var LIMIT_TEXT = {
     upload_mb: ['上传文件', '单个 Excel 不超过 5 MB'],
+    image_mb: ['长截图', '单张微信长截图不超过 20 MB，识别全程在本机完成'],
+    images: ['截图张数', '一次最多 20 张，按选择顺序拼接并去掉接缝重复'],
     max_rows: ['单次行数', '最多读取 1000 行'],
     max_chars: ['单次字数', '最多 12 万字'],
     cloud_chars: ['云端上限', '勾选云端 AI 时最多 4 万字，超出请拆分'],

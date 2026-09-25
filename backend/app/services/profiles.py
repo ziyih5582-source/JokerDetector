@@ -102,7 +102,12 @@ def prepare_messages(messages, self_speaker, other_speaker):
         for name, alias in sorted([(self_speaker, "[自己]"), (other_speaker, "[对方]")], key=lambda p: -len(p[0])):
             if len(name) > 1:
                 content = content.replace(name, alias)
-        result.append({"id": i, "role": "other" if m["speaker"] == other_speaker else "self", "content": redact(content)})
+        entry = {"id": i, "role": "other" if m["speaker"] == other_speaker else "self", "content": redact(content)}
+        # 表情/图片的情绪作为独立字段：只在存在时写入，避免改变无情绪片段的指纹
+        emotion = (m.get("emotion") or "").strip()
+        if emotion:
+            entry["emotion"] = emotion[:32]
+        result.append(entry)
     return result
 
 

@@ -12,11 +12,13 @@ from pathlib import Path
 
 import pandas as pd
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from PIL import Image
 
 from app.api.deps import analyzer, get_store
 from app.core import config
 from app.core.errors import call
 from app.schemas import AnalyzeInput, ContactInput, FactEdit, Message
+from app.services import ocr
 from app.services.profiles import prepare_messages, public_profile
 from app.services.unified import run_unified
 
@@ -24,6 +26,7 @@ router = APIRouter(prefix="/api/profiles", tags=["联系人档案（实验）"])
 
 MAX_XLSX_UNPACKED_BYTES = 25 * 1024 * 1024   # xlsx 解压后的上限，防 zip 炸弹
 MAX_XLSX_ENTRIES = 300
+ALLOWED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 
 
 @router.get("/contacts")
@@ -106,6 +109,93 @@ def parse(file: UploadFile = File(...)):
             raise HTTPException(400, "无法解析文件，请使用“发言者、内容”两列，或检查原微信导出格式") from None
     finally:
         file.file.close()
+
+
+def _load_screenshot(upload: UploadFile, index: int) -> Image.Image:
+    """校验并读入一张长截图；错误信息带上是第几张。"""
+    suffix = Path(upload.filename or "").suffix.lower()
+    if suffix not in ALLOWED_IMAGE_SUFFIXES:
+        raise HTTPException(400, f"第 {index} 张不是支持的图片格式（仅 .png / .jpg / .jpeg / .webp）")
+    content = upload.file.read(config.MAX_IMAGE_BYTES + 1)
+    if len(content) > config.MAX_IMAGE_BYTES:
+        raise HTTPException(413, f"第 {index} 张超过 {config.MAX_IMAGE_MB} MB，请压缩或分几次导入")
+    try:
+        image = Image.open(io.BytesIO(content))
+    except Exception:
+        raise HTTPException(400, f"第 {index} 张不是有效的图片文件") from None
+    if image.width * image.height > config.MAX_IMAGE_PIXELS:
+        raise HTTPException(413, f"第 {index} 张像素过大，请缩小尺寸后重试")
+    try:
+        image.load()
+    except Exception:
+        raise HTTPException(400, f"第 {index} 张图片已损坏，请换一张") from None
+    return image
+
+
+@router.post("/parse-image")
+def parse_image(
+    file: UploadFile | None = File(default=None),
+    files: list[UploadFile] = File(default=[]),
+):
+    """从一张或多张微信长截图里识别聊天记录，返回带时间/类型元数据的消息列表。
+
+    多张按传入顺序拼接，并自动去掉接缝处重复的消息。元数据仅供前端校对与展示，
+    提交分析时只取 speaker 与 content，因此不影响任何评分逻辑。OCR 依赖可选，
+    未安装时返回 503 而不是让站点崩溃。
+    """
+    uploads = ([file] if file is not None else []) + list(files)
+    if not uploads:
+        raise HTTPException(400, "请至少上传一张长截图")
+    if len(uploads) > config.MAX_IMAGES:
+        raise HTTPException(400, f"一次最多 {config.MAX_IMAGES} 张截图，请分几次导入")
+
+    batches = []
+    avatars = None
+    other_name = None
+    for index, upload in enumerate(uploads, start=1):
+        try:
+            image = _load_screenshot(upload, index)
+            try:
+                boxes = ocr.recognize_image(image)
+            except ocr.OCRUnavailable as exc:
+                raise HTTPException(503, str(exc)) from None
+            messages = ocr.build_messages(image, boxes)
+            if not messages:
+                raise HTTPException(400, f"第 {index} 张没有识别到聊天文字，请换一张更清晰的截图")
+            if avatars is None:
+                try:
+                    avatars = ocr.detect_avatars(image, boxes, image.width, image.height)
+                except Exception:
+                    avatars = None
+            if other_name is None:
+                try:
+                    other_name = ocr.detect_title(boxes, image.width)
+                except Exception:
+                    other_name = None
+        finally:
+            upload.file.close()
+        batches.append(messages)
+
+    messages, removed = ocr.merge_message_batches(batches)
+    if not messages:
+        raise HTTPException(400, "没有识别到有效的聊天文字，请更换截图")
+    if len(messages) > config.MAX_ROWS:
+        raise HTTPException(400, "单次最多识别 1000 条消息，请分几次导入")
+    if sum(len(m["content"]) for m in messages) > config.MAX_CHARS:
+        raise HTTPException(400, "识别出的文字过多，请分几次导入")
+
+    warning = "表情与图片为版面启发式识别，时间按最近可见的时间分隔推测，请在校对表中核对后再分析。"
+    if len(uploads) > 1:
+        seam = f"，并去掉了 {removed} 条接缝重复" if removed else ""
+        warning = f"已按选择顺序合并 {len(uploads)} 张截图{seam}。" + warning
+    return {
+        "speakers": [ocr.SELF_SPEAKER, ocr.OTHER_SPEAKER],
+        "other_name": other_name,
+        "messages": messages,
+        "avatars": avatars,
+        "image_count": len(uploads),
+        "warning": warning,
+    }
 
 
 @router.post("/contacts/{contact_id}/analyze")

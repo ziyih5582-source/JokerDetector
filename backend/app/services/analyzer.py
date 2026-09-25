@@ -65,6 +65,22 @@ NOT_JOKER_DESC = (
     "但记住，爱情是一场势均力敌的博弈，继续保持你的清醒，享受关系本身吧！"
 )
 
+def _build_transcript(data, self_id, emotions=None, limit=300):
+    """把消息拼成给 AI 看的对话文本；带情绪的条目标注「表情情绪」。
+
+    情绪只用于 AI 上下文，不进入 data 本身，因此本地统计与评分完全不受影响。
+    """
+    start = max(0, len(data) - limit)
+    lines = []
+    for index in range(start, len(data)):
+        speaker, message = data[index]
+        tag = '【自己】' if speaker == self_id else '【对方】'
+        emotion = emotions[index] if emotions and index < len(emotions) else None
+        suffix = f"（表情情绪：{emotion}）" if emotion else ""
+        lines.append(f"{tag}{speaker}: {message}{suffix}")
+    return "\n".join(lines)
+
+
 # ================== 核心分析引擎 ==================
 class JokerAnalyzer:
     def __init__(self):
@@ -297,14 +313,11 @@ class JokerAnalyzer:
         mapping = {'SSDT': '幻恋型', 'CONV': '镜像型', 'PLD': '弄臣型'}
         return mapping.get(hm, '殉道型')
 
-    def classify_joker_type_ai(self, data, self_id):
+    def classify_joker_type_ai(self, data, self_id, emotions=None):
         """AI 层小丑分类"""
         if self.client is None:
             return None, None
-        transcript = "\n".join(
-            [f"{'【自己】' if sp == self_id else '【对方】'}{sp}: {m}"
-             for sp, m in data[-300:]]
-        )
+        transcript = _build_transcript(data, self_id, emotions, limit=300)
         prompt = f"""你是一位极其敏锐的情感博弈分析师。阅读聊天记录，判断【自己】在关系中是否处于低位（小丑）。
 【严苛判定标尺】：
 1. 只要表现出：害怕冷场连续找话题、过度解释、单向提供情绪价值（即使对方有回复），必须判定为小丑。
@@ -331,14 +344,11 @@ class JokerAnalyzer:
         except Exception:
             return None, None
 
-    def ai_guidance(self, data, self_id, is_joker, joker_type):
+    def ai_guidance(self, data, self_id, is_joker, joker_type, emotions=None):
         """AI 情感疏导"""
         if self.client is None:
             return None
-        transcript = "\n".join(
-            [f"{'【自己】' if sp == self_id else '【对方】'}{sp}: {m}"
-             for sp, m in data[-500:]]
-        )
+        transcript = _build_transcript(data, self_id, emotions, limit=500)
         if is_joker:
             t_desc = JOKER_TYPES.get(joker_type, {}).get('desc', '')
             prompt = f"""你是一位理性客观的情感支持导师。用户被分析为「{joker_type}」小丑（{t_desc}）。
@@ -376,7 +386,8 @@ class JokerAnalyzer:
             result['guidance_error'] = "请先到「设置」确认云端 AI 已就绪"
             return result
         try:
-            result['guidance'] = self.ai_guidance(result['data'], result['self_id'], result['is_joker'], result['joker_type'])
+            result['guidance'] = self.ai_guidance(result['data'], result['self_id'], result['is_joker'],
+                                                   result['joker_type'], result.get('emotions'))
         except Exception as exc:
             result['guidance_error'] = ai_error_detail(exc)['message']
         return result
@@ -401,16 +412,19 @@ class JokerAnalyzer:
             prepared = prepare_messages(demo_messages, self_name, other_name)
             if sum(len(m['content']) for m in prepared) > 40000:
                 raise ValueError("云端分析单次最多 4 万字，请分段导入")
-            demo_messages = [{"speaker": "自己" if m['role'] == 'self' else "对方", "content": m['content']} for m in prepared]
+            demo_messages = [{"speaker": "自己" if m['role'] == 'self' else "对方",
+                              "content": m['content'], "emotion": m.get("emotion")} for m in prepared]
             self_name, other_name = "自己", "对方"
         data = []
+        emotions = []
         for msg in demo_messages:
             data.append((msg['speaker'], msg['content']))
+            emotions.append(msg.get('emotion') or None)
 
         self_id, other_id = self_name, other_name
         stats = self.compute_statistics(data, self_id, other_id)
         alg_type = self.classify_joker_type_algorithmic(stats)
-        ai_is_joker, ai_type = self.classify_joker_type_ai(data, self_id) if allow_ai else (None, None)
+        ai_is_joker, ai_type = self.classify_joker_type_ai(data, self_id, emotions) if allow_ai else (None, None)
 
         alg_score = stats['jokernum_alg']
         if ai_is_joker is not None:
@@ -429,6 +443,7 @@ class JokerAnalyzer:
         )
         result = {
             'data': data,
+            'emotions': emotions,
             'speakers': [self_name, other_name],
             'self_id': self_id,
             'other_id': other_id,

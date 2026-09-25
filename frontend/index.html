@@ -79,7 +79,7 @@
           <li>
             <span class="step-idx">一</span>
             <h4>把聊天粘进来</h4>
-            <p>每行「发言者：内容」即可，也可以直接导入微信导出的 Excel。手边没有记录，就用内置的两个虚构示例先跑一遍。</p>
+            <p>每行「发言者：内容」即可，也可以导入微信导出的 Excel，或导入微信长截图（可多选，本地识别、可逐条校对）。手边没有记录，就用内置的两个虚构示例先跑一遍。</p>
             <button type="button" class="line-btn quiet" data-go="flow">去粘贴</button>
           </li>
           <li>
@@ -148,7 +148,7 @@
       <div class="lede">
         <span class="eyebrow">谈心分析 · 第一步</span>
         <h2>把一段聊天投进湖里</h2>
-        <p>每行「发言者：内容」，或导入微信导出的 Excel。一次提交同时得到情感分析与人物档案更新；不选档案对象就只看水纹、不落一笔。</p>
+        <p>每行「发言者：内容」，或导入微信导出的 Excel / 一组长截图。长截图可多选，在本机逐张识别后按你选择的顺序拼成一张可修改的校对表（自动去掉接缝重复），改完再分析。一次提交同时得到情感分析与人物档案更新；不选档案对象就只看水纹、不落一笔。</p>
       </div>
 
       <ol class="flow-steps" aria-hidden="true">
@@ -160,21 +160,6 @@
 
       <div class="grid">
         <div class="col-main">
-          <label class="field-label" for="chat-text">聊天记录</label>
-          <textarea id="chat-text" rows="8" spellcheck="false"
-            placeholder="我：周末有什么安排？&#10;小林：我喜欢徒步&#10;我：那一起去吧"></textarea>
-
-          <div class="line-actions">
-            <button type="button" id="parse-text" class="line-btn">辨认说话的人</button>
-            <label class="line-btn" for="chat-file">导入 Excel
-              <input id="chat-file" type="file" accept=".xlsx,.xls" hidden>
-            </label>
-            <button type="button" id="sample-one" class="line-btn quiet">填入示例一</button>
-            <button type="button" id="sample-two" class="line-btn quiet">填入示例二</button>
-            <button type="button" id="clear-chat" class="line-btn quiet">清空</button>
-            <span id="message-count" class="note"></span>
-          </div>
-
           <div id="speaker-panel" hidden>
             <div class="two-up">
               <div>
@@ -191,6 +176,30 @@
               <p class="note">只有勾选云端 AI 时，下面这些片段才会发出去；档案只留脱敏引用。自动脱敏认不出所有隐私，请自行删去不愿处理的内容。</p>
               <pre id="redacted-preview"></pre>
             </details>
+          </div>
+
+          <label class="field-label" for="chat-text">聊天记录</label>
+          <textarea id="chat-text" rows="8" spellcheck="false"
+            placeholder="我：周末有什么安排？&#10;小林：我喜欢徒步&#10;我：那一起去吧"></textarea>
+
+          <div class="line-actions">
+            <button type="button" id="parse-text" class="line-btn">辨认说话的人</button>
+            <label class="line-btn" for="chat-file">导入 Excel
+              <input id="chat-file" type="file" accept=".xlsx,.xls" hidden>
+            </label>
+            <label class="line-btn" for="chat-image">导入长截图（可多选）
+              <input id="chat-image" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
+            </label>
+            <button type="button" id="sample-one" class="line-btn quiet">填入示例一</button>
+            <button type="button" id="sample-two" class="line-btn quiet">填入示例二</button>
+            <button type="button" id="clear-chat" class="line-btn quiet">清空</button>
+            <span id="message-count" class="note"></span>
+          </div>
+
+          <div id="ocr-review" hidden>
+            <p class="note" id="ocr-note"></p>
+            <div id="ocr-avatars" class="ocr-avatars" hidden></div>
+            <div id="ocr-table" class="ocr-table"></div>
           </div>
 
           <h3 class="block-title"><span>例</span>手边没有记录？用示例试试</h3>
@@ -259,6 +268,11 @@
       <section class="block" id="profile-result" hidden>
         <h3 class="block-title"><span>册</span>人物档案变动</h3>
         <div id="profile-result-body"></div>
+      </section>
+
+      <section class="block" id="ocr-summary" hidden>
+        <h3 class="block-title"><span>识</span>识别到的补充信息（不参与评分）</h3>
+        <div id="ocr-summary-body"></div>
       </section>
 
       <section class="block" id="guidance-block" hidden>
@@ -402,7 +416,7 @@
 
       <h3 class="block-title"><span>一</span>一分钟上手</h3>
       <ol class="steps" id="guide-steps">
-        <li>在顶部点「谈心分析」，把聊天粘进文本框（每行「发言者：内容」），或导入微信导出的 Excel，然后点「辨认说话的人」。</li>
+        <li>在顶部点「谈心分析」，把聊天粘进文本框（每行「发言者：内容」），或导入微信导出的 Excel / 长截图（可多选，按时间顺序选）。长截图会先拼成校对表，逐条改错后再点「辨认说话的人」或直接分析。</li>
         <li>核对「我（自己）」和「对方」；想让湖面记住这个人，就在右栏选一个档案、或新建一个，并勾选第一项确认。</li>
         <li>点「开始分析」。结果页会同时给出<b>水纹</b>（分数、类型印章、五维墨线、双方比对）与<b>档案变动</b>（新增了哪几条喜好、有没有互相冲突）。</li>
         <li>只想分析、不留痕迹，就把「这段聊天记在谁名下」留成「不建档」。想找人说说话，去「找钓翁聊聊」。</li>
@@ -434,7 +448,7 @@
         </div>
         <div class="panel">
           <h4>谈心分析</h4>
-          <p>唯一的输入口。粘贴文本或导入 Excel、辨认说话的人、核对脱敏预览、决定这次是否写进档案、是否调用云端 AI。示例按钮可以先用虚构内容跑一遍。</p>
+          <p>唯一的输入口。粘贴文本、导入 Excel，或导入微信长截图（可多选，本机 OCR：先按选择顺序拼成校对表并去掉接缝重复；顶部状态栏与底部输入栏会自动排除，标题栏昵称会作为「对方」的名字；文字默认折叠、点开才改，图片与表情常展开、可直接选情绪并点缩略图看原图）。时间与头像只作展示；表情情绪会随脱敏片段一起发给云端 AI，改情绪时脱敏预览会立即更新，但本地评分不看它。辨认说话的人、核对脱敏预览、决定这次是否写进档案、是否调用云端 AI。示例按钮可以先用虚构内容跑一遍。</p>
         </div>
         <div class="panel">
           <h4>分析结果</h4>
@@ -579,6 +593,14 @@
   <div class="line-actions">
     <button type="button" id="cancel-delete" class="line-btn quiet">取消</button>
     <button type="button" id="confirm-delete" class="seal-btn danger">确认</button>
+  </div>
+</dialog>
+
+<dialog id="image-dialog">
+  <h2>表情 / 图片原图</h2>
+  <img id="image-dialog-img" alt="表情或图片原图">
+  <div class="line-actions">
+    <button type="button" id="close-image-dialog" class="line-btn quiet">关闭</button>
   </div>
 </dialog>
 

@@ -150,6 +150,8 @@ async def guide():
         "not_joker_desc": NOT_JOKER_DESC,
         "limits": {
             "upload_mb": config.MAX_UPLOAD_MB,
+            "image_mb": config.MAX_IMAGE_MB,
+            "images": config.MAX_IMAGES,
             "max_rows": config.MAX_ROWS,
             "max_chars": config.MAX_CHARS,
             "cloud_chars": config.MAX_CLOUD_CHARS,

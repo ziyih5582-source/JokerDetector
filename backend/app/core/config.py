@@ -19,6 +19,8 @@ FRONTEND_DIR = PROJECT_ROOT / "frontend"
 STATIC_URL_PATH = "/static"
 MUSIC_DIR = PROJECT_ROOT / "assets" / "music"
 PICTURES_DIR = PROJECT_ROOT / "assets" / "pictures"
+# 表情情绪模板库（可选）：按情绪命名的表情图，如 assets/emoji/开心.png
+EMOJI_DIR = PROJECT_ROOT / "assets" / "emoji"
 
 # 运行时数据与样例
 DATA_DIR = PROJECT_ROOT / "data"
@@ -41,6 +43,11 @@ MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 MAX_ROWS = 1000
 MAX_CHARS = 120_000
 MAX_CLOUD_CHARS = 40_000
+# 微信长截图识别：图片与解压后像素上限，防止超大图/解压炸弹拖垮进程
+MAX_IMAGE_MB = 20
+MAX_IMAGE_BYTES = MAX_IMAGE_MB * 1024 * 1024
+MAX_IMAGE_PIXELS = 80_000_000
+MAX_IMAGES = 20  # 单次最多同时导入的截图张数
 FACTS_PER_CONTACT = 500
 BATCHES_PER_CONTACT = 200
 EVIDENCE_PER_FACT = 10

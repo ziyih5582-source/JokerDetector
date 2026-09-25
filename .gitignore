@@ -162,6 +162,9 @@ data/private/
 profiles.sqlite3
 profile.key
 
+# 重构前的旧副本：含本地私有档案与过时代码，不参与版本控制
+/web/
+
 # 本地临时工具（无头浏览器等）
 .dsh-tools/
 
@@ -175,6 +178,12 @@ assets/music/*.MP3
 assets/pictures/*.jpg
 assets/pictures/*.jpeg
 assets/pictures/*.png
+# 表情情绪模板：请自备，不入库
+assets/emoji/*.png
+assets/emoji/*.jpg
+assets/emoji/*.jpeg
+assets/emoji/*.webp
+assets/emoji/*.bmp
 
 # Spyder project settings
 .spyderproject

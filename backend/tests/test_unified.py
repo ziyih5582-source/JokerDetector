@@ -120,7 +120,7 @@ def test_demo_cloud_consent_still_generates_the_long_report(client, monkeypatch)
     """cloud_consent 在示例接口里同时表示「生成长文」，保持旧语义。"""
     calls = []
 
-    def fake_guidance(self, data, self_id, is_joker, joker_type):
+    def fake_guidance(self, data, self_id, is_joker, joker_type, emotions=None):
         calls.append(1)
         return "长文" * 600
 
@@ -139,3 +139,36 @@ def test_unified_page_is_served_at_both_entry_points(client):
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
         assert "script-src 'self'" in response.headers["content-security-policy"]
+
+
+def test_emotion_reaches_preview_but_does_not_change_score(client):
+    """表情情绪作为独立字段进入脱敏片段，但不参与本地评分。"""
+    with_emotion = body(messages=[
+        {"speaker": "我", "content": "[表情]", "emotion": "开心"},
+        {"speaker": "小林", "content": "我喜欢徒步"},
+        {"speaker": "我", "content": "好呀"},
+    ])
+    without_emotion = body(messages=[
+        {"speaker": "我", "content": "[表情]"},
+        {"speaker": "小林", "content": "我喜欢徒步"},
+        {"speaker": "我", "content": "好呀"},
+    ])
+    first = client.post("/api/analyze/unified", json=with_emotion)
+    second = client.post("/api/analyze/unified", json=without_emotion)
+    assert first.status_code == 200 and second.status_code == 200
+    assert first.json()["analysis"]["verdict"]["score"] == second.json()["analysis"]["verdict"]["score"]
+
+    preview = client.post("/api/profiles/preview", json={
+        "messages": [{"speaker": "我", "content": "[表情]", "emotion": "开心"},
+                     {"speaker": "小林", "content": "在"}],
+        "self_speaker": "我", "other_speaker": "小林",
+    })
+    assert preview.status_code == 200
+    assert preview.json()["messages"][0]["emotion"] == "开心"
+
+
+def test_ai_transcript_marks_emotion():
+    from app.services.analyzer import _build_transcript
+    text = _build_transcript([("我", "[表情]"), ("对方", "你好")], "我", ["开心", None])
+    assert "（表情情绪：开心）" in text
+    assert text.count("（表情情绪：") == 1

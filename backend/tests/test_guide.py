@@ -68,6 +68,8 @@ def test_analysis_and_guide_agree_on_metric_metadata(client):
 def test_guide_limits_cover_the_real_caps(client):
     limits = client.get("/api/guide").json()["limits"]
     assert limits["upload_mb"] == 5
+    assert limits["image_mb"] == 20
+    assert limits["images"] == 20
     assert limits["max_rows"] == 1000
     assert limits["max_chars"] == 120000
     assert limits["cloud_chars"] == 40000
