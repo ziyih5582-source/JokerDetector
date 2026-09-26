@@ -12,12 +12,29 @@ from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import analyzer, get_store
 from app.core import config
-from app.schemas import UnifiedInput
+from app.schemas import JokerDetectInput, UnifiedInput
 from app.services.demo_data import DEMO_CASES
 from app.services.report import build_report
 from app.services.unified import run_unified
 
 router = APIRouter(prefix="/api/analyze", tags=["统一分析"])
+
+
+@router.post("/joker/detect")
+def joker_detect(body: JokerDetectInput):
+    """小丑鉴定所：本地「六征」判定，不调用云端 AI。
+
+    防误伤规则：单向性命中 + 其余五项至少命中一项 + 综合分 ≥ 45 才判定为小丑。
+    """
+    if body.self_speaker == body.other_speaker:
+        raise HTTPException(400, "「我」和「对方」不能是同一个人")
+    if sum(len(m.content) for m in body.messages) > config.MAX_CHARS:
+        raise HTTPException(400, "单次聊天内容不能超过 12 万字，请分段导入")
+    data = [(m.speaker, m.content) for m in body.messages]
+    speakers = {sp for sp, _ in data}
+    if speakers != {body.self_speaker, body.other_speaker}:
+        raise HTTPException(400, "只支持明确的双人聊天，请选择文件中实际的两位发言者")
+    return analyzer.detect_joker_profile(data, body.self_speaker, body.other_speaker)
 
 
 @router.post("/unified")

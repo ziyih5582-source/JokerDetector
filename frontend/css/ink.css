@@ -70,6 +70,7 @@ body[data-view="flow"]      #pond-canvas,
 body[data-view="result"]    #pond-canvas,
 body[data-view="book"]      #pond-canvas,
 body[data-view="config"]    #pond-canvas,
+body[data-view="joker"]     #pond-canvas,
 body[data-view="fisherman"] #pond-canvas,
 body[data-view="theory"]    #pond-canvas,
 body[data-view="guide"]     #pond-canvas { opacity: 1; }
@@ -91,6 +92,7 @@ body[data-view="result"] .veil { opacity: .80; }
 body[data-view="flow"] .veil,
 body[data-view="book"] .veil,
 body[data-view="config"] .veil,
+body[data-view="joker"] .veil,
 body[data-view="fisherman"] .veil { opacity: .78; }
 body[data-view="theory"] .veil,
 body[data-view="guide"] .veil { opacity: .86; }
@@ -242,6 +244,7 @@ body[data-view="flow"]   .view[data-view="flow"],
 body[data-view="result"] .view[data-view="result"],
 body[data-view="book"]   .view[data-view="book"],
 body[data-view="config"] .view[data-view="config"],
+body[data-view="joker"]  .view[data-view="joker"],
 body[data-view="fisherman"] .view[data-view="fisherman"],
 body[data-view="theory"] .view[data-view="theory"],
 body[data-view="guide"] .view[data-view="guide"] { display: block; }
@@ -1627,3 +1630,306 @@ dialog h2 {
   border-radius: 4px;
   background: rgba(255, 253, 248, .6);
 }
+
+/* ---------------------------------------------------------------- 小丑鉴定所 */
+
+/* 导航标识：朱砂底 + 跳动红点，与素色导航形成对比 */
+.ledger .nav-joker {
+  color: #fdfaf3;
+  background: var(--vermilion);
+  padding: 4px 10px 5px;
+  letter-spacing: .18em;
+  border-radius: 2px;
+  position: relative;
+  transition: transform .3s ease, background .3s ease;
+}
+.ledger .nav-joker:hover {
+  color: #fff;
+  background: #b04a3c;
+  transform: rotate(-1.2deg) scale(1.03);
+}
+.ledger .nav-joker::after { display: none; }
+.nav-ping {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #d65a4a;
+  animation: navPing 1.6s ease-out infinite;
+}
+@keyframes navPing {
+  0%   { transform: scale(.6); opacity: 1; }
+  70%  { transform: scale(1.8); opacity: 0; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+body[data-view="joker"] .ledger button[data-go="joker"] { background: #8f3227; }
+
+/* 首页印章入口：全身马戏团小丑（固定在整屏最右侧）+ 竖排朱砂印章 */
+.joker-seal {
+  position: fixed;
+  right: max(16px, 2.2vw);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 30;              /* 高于首页画卷与薄纱，避免被图片遮住 */
+  isolation: isolate;
+  appearance: none;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+/* 只在首页显示，其余页面让位给正文 */
+body[data-view="pond"] .joker-seal { display: flex; }
+.joker-seal:hover .joker-seal-figure { transform: rotate(-2.5deg) scale(1.06); }
+.joker-seal-figure {
+  display: block;
+  width: 132px;
+  height: 250px;
+  transition: transform .4s ease;
+  animation: sealBob 2.6s ease-in-out infinite;
+  filter: drop-shadow(0 8px 14px rgba(50, 30, 20, .24));
+}
+@keyframes sealBob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50%      { transform: translateY(-12px) rotate(2deg); }
+}
+.joker-seal-text {
+  writing-mode: vertical-rl;
+  font-family: var(--kai);
+  font-size: 21px;
+  letter-spacing: .34em;
+  color: var(--vermilion);
+  border: 2px solid var(--vermilion-soft);
+  padding: 14px 8px;
+  border-radius: 3px;
+  background: rgba(250, 247, 240, .78);
+  box-shadow: 0 2px 14px rgba(166, 60, 48, .18);
+}
+.joker-seal-hint {
+  font-size: 12px;
+  letter-spacing: .14em;
+  color: var(--vermilion-soft);
+}
+@media (max-width: 1100px) {
+  .joker-seal-figure { width: 104px; height: 196px; }
+}
+@media (max-width: 820px) {
+  /* 窄屏右侧没有空位，直接隐藏入口（导航里的「小丑鉴定所」仍在） */
+  .joker-seal { display: none !important; }
+}
+
+/* 鉴定所视图 */
+.joker-lede h2 { color: var(--vermilion); }
+/* 六征上方的全身马戏团小丑 */
+.joker-aside-figure {
+  display: block;
+  width: 138px;
+  height: 250px;
+  margin: 0 auto 10px;
+  animation: sealBob 2.6s ease-in-out infinite;
+  filter: drop-shadow(0 8px 16px rgba(50, 30, 20, .22));
+}
+.joker-sign-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  font-size: 13.5px;
+  color: var(--ink-mid);
+  line-height: 2.1;
+}
+.joker-sign-list li {
+  padding-left: 1.2em;
+  position: relative;
+}
+.joker-sign-list li::before {
+  content: "·";
+  position: absolute;
+  left: .2em;
+  color: var(--vermilion);
+  font-weight: 700;
+}
+.joker-run {
+  font-size: 17px;
+  letter-spacing: .42em;
+  padding: 13px 0 13px .42em;
+}
+
+/* 判定弹窗 */
+.joker-dialog {
+  position: relative;
+  max-width: 560px;
+  border: 1px solid rgba(166, 60, 48, .34);
+  padding-right: 128px;
+}
+.joker-dialog::backdrop { background: rgba(30, 24, 22, .45); }
+/* 右上角静态小丑：按类型放置对应形象 */
+.joker-dialog-figure {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 96px;
+  height: 112px;
+  pointer-events: none;
+  opacity: .96;
+  filter: drop-shadow(0 4px 10px rgba(166, 60, 48, .18));
+}
+@media (max-width: 620px) {
+  .joker-dialog { padding-right: 30px; }
+  .joker-dialog-figure { width: 74px; height: 86px; top: 12px; right: 12px; }
+}
+.joker-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+.joker-dialog-head h2 {
+  color: var(--vermilion);
+  font-size: 24px;
+  margin: 0;
+  letter-spacing: .16em;
+}
+.joker-dialog-seal {
+  transform: rotate(-3deg);
+  flex: none;
+}
+.joker-dialog .big-quote { margin: 10px 0 4px; }
+.joker-signs {
+  margin: 16px 0 4px;
+  border-top: 1px solid var(--hairline);
+  padding-top: 12px;
+}
+.joker-signs .sign-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  border-bottom: 1px dashed var(--hairline-2);
+}
+.joker-signs .sign-row:last-child { border-bottom: 0; }
+.joker-signs .sign-row.hit { color: var(--ink); }
+.joker-signs .sign-badge {
+  flex: none;
+  width: 4.2em;
+  font-size: 11.5px;
+  letter-spacing: .1em;
+  color: var(--ink-faint);
+}
+.joker-signs .sign-row.hit .sign-badge { color: var(--vermilion); font-weight: 700; }
+.joker-signs .sign-label { flex: none; width: 5.4em; color: var(--ink-mid); }
+.joker-signs .sign-detail { flex: 1 1 auto; min-width: 0; }
+
+/* 全屏小丑层 */
+#clown-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity .9s ease;
+}
+#clown-layer.active { opacity: 1; }
+#clown-layer.fade-out { opacity: 0; }
+
+.clown {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+.clown-face {
+  position: relative;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fdf6e8, #f0dfbe 70%, #e2cba0);
+  box-shadow:
+    inset -6px -10px 18px rgba(120, 80, 40, .18),
+    0 8px 26px rgba(50, 30, 20, .22);
+}
+.clown-hat {
+  position: absolute;
+  left: 50%;
+  top: -18%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left-style: solid;
+  border-right-style: solid;
+  border-bottom-style: solid;
+  border-left-color: transparent;
+  border-right-color: transparent;
+  border-bottom-color: #b0483c;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.14));
+}
+.clown-eye {
+  position: absolute;
+  top: 38%;
+  width: 9%;
+  height: 9%;
+  border-radius: 50%;
+  background: #2c2420;
+}
+.clown-eye.left  { left: 28%; }
+.clown-eye.right { right: 28%; }
+.clown-eye::after {
+  content: "";
+  position: absolute;
+  top: 18%;
+  left: 18%;
+  width: 28%;
+  height: 28%;
+  border-radius: 50%;
+  background: rgba(255,255,255,.85);
+}
+.clown-nose {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #e06a52, #a63c30 70%);
+  box-shadow: 0 2px 6px rgba(166, 60, 48, .4);
+}
+.clown-cheek {
+  position: absolute;
+  top: 54%;
+  width: 13%;
+  height: 9%;
+  border-radius: 50%;
+  background: rgba(214, 106, 82, .28);
+  filter: blur(1px);
+}
+.clown-cheek.left  { left: 16%; }
+.clown-cheek.right { right: 16%; }
+.clown-mouth {
+  position: absolute;
+  left: 50%;
+  top: 62%;
+  transform: translateX(-50%);
+  border-bottom: 3px solid #5c3328;
+  border-radius: 0 0 120px 120px;
+}
+
+.clown-bubble {
+  position: absolute;
+  padding: 7px 14px;
+  font-family: var(--kai);
+  letter-spacing: .08em;
+  color: var(--vermilion);
+  background: rgba(250, 246, 238, .92);
+  border: 1px solid var(--vermilion-soft);
+  border-radius: 14px;
+  box-shadow: 0 4px 18px rgba(166, 60, 48, .2);
+  opacity: 0;
+  transform: translateY(8px) scale(.92);
+  transition: opacity .5s ease, transform .5s ease;
+  white-space: nowrap;
+}
+.clown-bubble.show { opacity: 1; transform: translateY(0) scale(1); }

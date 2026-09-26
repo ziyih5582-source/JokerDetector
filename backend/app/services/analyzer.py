@@ -56,6 +56,18 @@ JOKER_TYPES = {
         "suggestion": "脑海里的剧本不等于现实。勇敢地走出幻想，哪怕只是多说一句话，也比一万次内心戏更有意义。",
         "image": "幻恋型.jpg", "music": "水星记.mp3", "color": "#8B6FAF",
         "keywords": ["你是不是", "我在想", "如果", "以后", "会不会", "可能", "感觉", "有没有可能", "做梦", "梦到"]
+    },
+    "守候型": {
+        "desc": "被明确拒绝后仍然不肯放手，用「再等等」「万一呢」给自己续命，甚至等对方分手。",
+        "suggestion": "对方已经给出答案了，继续等待只是在消耗自己。真正的不打扰，是体面地退回到自己的生活。",
+        "image": "守候型.jpg", "music": "水星记.mp3", "color": "#7A5A3A",
+        "keywords": ["再等等", "万一", "我等你", "没关系我不急", "还有机会", "再试一次", "再给我一次机会", "我等你分手", "我不会放弃"]
+    },
+    "单向型": {
+        "desc": "这段关系全靠你一个人在推进，你不主动找对方，你们就会断联。",
+        "suggestion": "健康的关系是双向奔赴的。试着停下来几天，看看对方会不会主动找你——答案往往一目了然。",
+        "image": "单向型.jpg", "music": "一直很安静.mp3", "color": "#8A4A6A",
+        "keywords": ["你不找我", "为什么不回", "在忙吗", "忙完了吗", "你在吗", "又忘了回我", "一直是我主动", "都是我找你"]
     }
 }
 
@@ -296,6 +308,20 @@ class JokerAnalyzer:
         if stats['has_voice_or_call']:
             score *= VOICE_PENALTY
 
+        # Z6: 拒绝后继续度 (AFTER_REJECT)
+        # 启发式识别对方的拒绝句，统计最后一条拒绝之后己方仍继续发送的消息比例。
+        reject_pattern = re.compile(
+            r"不合适|还是算了|不喜欢你|做朋友|我有喜欢的人|我有对象|别.{0,4}发了|别再|拒绝|不可能|我们不合适|我对你没感觉|停止"
+        )
+        reject_indices = [i for i, (sp, msg) in enumerate(data) if sp == other_id and reject_pattern.search(msg)]
+        if reject_indices:
+            last_reject = reject_indices[-1]
+            remaining_self = sum(1 for sp, _ in data[last_reject + 1:] if sp == self_id)
+            total_self = stats['self_msg_count']
+            after_reject = (remaining_self / (total_self + 1e-6)) if total_self else 0.0
+        else:
+            after_reject = 0.0
+
         stats['jokernum_alg'] = round(score, 2)
         stats['z_metrics'] = {
             'SSDT': round(Z_SSDT, 4),
@@ -304,7 +330,141 @@ class JokerAnalyzer:
             'EPEG': round(Z_EPEG, 4),
             'CONV': round(Z_CONV, 4)
         }
+        stats['after_reject_ratio'] = round(after_reject, 4)
         return stats
+
+    # ---------- 小丑六征检测 ----------
+    # 关键词分组：对应「自己骗自己 / 自己感动自己 / 自己贬低自己」的六个典型特征
+    _SIGN_KEYWORDS = {
+        "self_moved": ["我都可以", "随叫随到", "听你的", "我没事", "为你", "值得", "应该的", "随便我", "为了你"],
+        "fantasy": ["我在想", "如果", "以后", "会不会", "可能", "感觉", "有没有可能", "做梦", "梦到"],
+        "boundary": ["只要你", "不用管我", "我可以等", "我牺牲", "借给你", "我借你", "我的钱你先用"],
+        "self_mockery": ["我不配", "我这种人", "小丑", "废物", "我太菜", "丢人", "救命", "我是小丑"],
+        "no_accept_reject": ["再等等", "万一", "我等你", "没关系我不急", "还有机会", "再试一次", "再给我一次机会", "我等你分手", "我不会放弃"],
+    }
+    _SIGN_TO_TYPE = {
+        "self_moved": "殉道型",
+        "fantasy": "幻恋型",
+        "boundary": "殉道型",
+        "self_mockery": "弄臣型",
+        "no_accept_reject": "守候型",
+    }
+    _SIGN_LABEL = {
+        "one_way": "单向推进",
+        "self_moved": "自我感动",
+        "fantasy": "幻想脑补",
+        "boundary": "边界失守",
+        "no_accept_reject": "不接受拒绝",
+        "self_mockery": "事后自嘲",
+    }
+
+    def detect_joker_profile(self, data, self_id, other_id):
+        """基于「小丑六征」的本地判定。
+
+        规则（防误伤）：单向性命中 + 其余五项至少命中一项 + 综合分 ≥ 45，
+        才判定为小丑；类型取命中征状中得分最高的一项。
+        """
+        stats = self.compute_statistics(data, self_id, other_id)
+        z = stats['z_metrics']
+
+        # 单向性：消息比例 + 最长连发
+        total = stats['self_msg_count'] + stats['other_msg_count']
+        self_ratio = stats['self_msg_count'] / total if total else 0.0
+        streak_ratio = stats['max_self_cont'] / max(stats['max_other_cont'], 1)
+        one_way_score = 0.0
+        if self_ratio >= 0.62:
+            one_way_score += 0.6
+        elif self_ratio >= 0.55:
+            one_way_score += 0.3
+        if streak_ratio >= 2.0:
+            one_way_score += 0.4
+        elif streak_ratio >= 1.5:
+            one_way_score += 0.2
+        one_way_hit = one_way_score >= 0.5
+
+        sign_scores = {}
+        sign_scores["self_moved"] = min(1.0, self._count_group(data, self_id, "self_moved") / 6.0) * 0.6 + max(0.0, z['PLD']) * 0.4
+        sign_scores["fantasy"] = min(1.0, self._count_group(data, self_id, "fantasy") / 6.0) * 0.6 + max(0.0, z['SSDT']) * 0.4
+        sign_scores["boundary"] = min(1.0, self._count_group(data, self_id, "boundary") / 6.0) * 0.7 + max(0.0, z['PLD']) * 0.3
+        sign_scores["self_mockery"] = min(1.0, self._count_group(data, self_id, "self_mockery") / 6.0) * 0.7 + max(0.0, z['PLD']) * 0.3
+        sign_scores["no_accept_reject"] = min(1.0, self._count_group(data, self_id, "no_accept_reject") / 6.0) * 0.5 + min(1.0, stats['after_reject_ratio'] * 2.0) * 0.5
+
+        sign_hits = {name: s >= 0.45 for name, s in sign_scores.items()}
+        hit_count = sum(sign_hits.values())
+
+        # 综合分：沿用算法分，叠加命中数
+        score = min(100.0, stats['jokernum_alg'] + hit_count * 6.0)
+        if stats['has_voice_or_call']:
+            score *= VOICE_PENALTY
+
+        is_joker = bool(one_way_hit and hit_count >= 1 and score >= 45.0)
+
+        # 定级
+        if score > 75 and hit_count >= 3:
+            level = "confirmed"
+        elif score >= 60 and hit_count >= 2:
+            level = "high_risk"
+        elif score >= 45 and hit_count >= 1:
+            level = "suspicious"
+        elif score >= 30:
+            level = "mild"
+        else:
+            level = "healthy"
+
+        # 类型：命中征状中得分最高的一项映射到类型；单向性单独映射
+        joker_type = None
+        if is_joker:
+            best_sign = max(sign_scores, key=lambda k: sign_scores[k])
+            best_score = sign_scores[best_sign]
+            if best_score >= 0.45:
+                joker_type = self._SIGN_TO_TYPE.get(best_sign)
+            else:
+                joker_type = "单向型" if one_way_score >= 0.7 else None
+            if not joker_type:
+                joker_type = self.classify_joker_type_algorithmic(stats)
+
+        signs = {
+            "one_way": {
+                "label": self._SIGN_LABEL["one_way"],
+                "hit": one_way_hit,
+                "score": round(one_way_score, 2),
+                "detail": f"你发了 {stats['self_msg_count']} 条，对方 {stats['other_msg_count']} 条；最长连发 {stats['max_self_cont']} vs {stats['max_other_cont']}",
+            }
+        }
+        for sign_name, sign_score in sign_scores.items():
+            signs[sign_name] = {
+                "label": self._SIGN_LABEL[sign_name],
+                "hit": sign_hits[sign_name],
+                "score": round(sign_score, 2),
+                "detail": self._sign_detail(sign_name, data, self_id, stats),
+            }
+
+        return {
+            "is_joker": is_joker,
+            "type": joker_type,
+            "level": level,
+            "score": round(score, 2),
+            "signs": signs,
+            "type_info": JOKER_TYPES.get(joker_type, {}) if joker_type else None,
+        }
+
+    def _sign_detail(self, name, data, self_id, stats):
+        z = stats['z_metrics']
+        if name == "self_moved":
+            return f"低姿态语言密度 PLD={z['PLD']:+.2f}，付出型话术出现 {self._count_group(data, self_id, 'self_moved')} 次"
+        if name == "fantasy":
+            return f"脑补类词汇出现 {self._count_group(data, self_id, 'fantasy')} 次，连续发送倾向 SSDT={z['SSDT']:+.2f}"
+        if name == "boundary":
+            return f"牺牲/托付型表达出现 {self._count_group(data, self_id, 'boundary')} 次"
+        if name == "self_mockery":
+            return f"自贬词汇出现 {self._count_group(data, self_id, 'self_mockery')} 次"
+        if name == "no_accept_reject":
+            return f"拒绝后继续发送比例 {stats['after_reject_ratio'] * 100:.0f}%，挽留词出现 {self._count_group(data, self_id, 'no_accept_reject')} 次"
+        return ""
+
+    def _count_group(self, data, self_id, group):
+        words = self._SIGN_KEYWORDS.get(group, [])
+        return sum(msg.count(w) for sp, msg in data if sp == self_id for w in words)
 
     # ---------- 小丑分类 ----------
     def classify_joker_type_algorithmic(self, stats):

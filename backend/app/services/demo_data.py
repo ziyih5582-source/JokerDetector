@@ -102,5 +102,39 @@ DEMO_HEALTHY = {
     ]
 }
 
+# ==================== 案例 4：守候型小丑 ====================
+DEMO_WAITER = {
+    "title": "🕯️ 案例四：守候型",
+    "description": "被明确拒绝后仍不肯放手，「再等等」「万一呢」，把等待当成深情",
+    "self_name": "阿泽",
+    "other_name": "小鹿",
+    "messages": [
+        {"speaker": "阿泽", "content": "小鹿，周末有空吗？我发现一家新开的日料"},
+        {"speaker": "小鹿", "content": "最近有点忙"},
+        {"speaker": "阿泽", "content": "没关系没关系，那你什么时候有空？"},
+        {"speaker": "阿泽", "content": "我都可以，迁就你的时间"},
+        {"speaker": "小鹿", "content": "阿泽，我想跟你说清楚"},
+        {"speaker": "小鹿", "content": "我觉得我们不太合适"},
+        {"speaker": "小鹿", "content": "你人很好，但我对你真的没有那种感觉"},
+        {"speaker": "阿泽", "content": "是不是我哪里做得不好？我可以改"},
+        {"speaker": "阿泽", "content": "你别急着下结论好不好"},
+        {"speaker": "小鹿", "content": "不是改不改的问题，就是没感觉"},
+        {"speaker": "小鹿", "content": "我们做朋友吧"},
+        {"speaker": "阿泽", "content": "我不想只做朋友"},
+        {"speaker": "阿泽", "content": "我再等等，万一你以后会改变主意呢"},
+        {"speaker": "小鹿", "content": "别等了，真的不合适"},
+        {"speaker": "阿泽", "content": "没关系我不急，我可以慢慢等"},
+        {"speaker": "阿泽", "content": "你谈恋爱了也没关系，我等你"},
+        {"speaker": "小鹿", "content": "你这样让我压力很大"},
+        {"speaker": "阿泽", "content": "对不起对不起，我不是故意的"},
+        {"speaker": "阿泽", "content": "我就是放不下你，再给我一次机会好不好"},
+        {"speaker": "小鹿", "content": "别再给我发消息了"},
+        {"speaker": "阿泽", "content": "好，我不发了"},
+        {"speaker": "阿泽", "content": "但我还是想让你知道，我不会放弃"},
+        {"speaker": "阿泽", "content": "你早点休息，晚安"},
+        {"speaker": "阿泽", "content": "我明天再来找你"},
+    ]
+}
+
 # 所有 Demo 案例
-DEMO_CASES = [DEMO_SIMP, DEMO_JESTER, DEMO_HEALTHY]
+DEMO_CASES = [DEMO_SIMP, DEMO_JESTER, DEMO_WAITER, DEMO_HEALTHY]

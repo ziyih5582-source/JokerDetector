@@ -18,6 +18,8 @@
     ocrUsed: false,
     ocrAvatars: null,
     ocrOtherName: null,
+    jokerMessages: [],
+    jokerOcrName: null,
     editFactId: null,
     pendingDelete: null,
     selection: 0,
@@ -289,14 +291,23 @@
   var OCR_INSTALL_HINT = '未安装 OCR 依赖：请在项目根目录运行 .venv/Scripts/python -m pip install -r backend/requirements-ocr.txt（macOS/Linux 用 .venv/bin/python），再重启服务。';
 
   function syncOcrEntry() {
-    var input = $('chat-image');
-    if (!input) return;
-    var label = $('chat-image-label');
     var available = !(state.health && state.health.ocr_available === false);
-    input.disabled = !available;
-    label.classList.toggle('disabled', !available);
-    label.title = available ? '' : OCR_INSTALL_HINT;
-    $('chat-image-text').textContent = available ? '导入长截图（可多选）' : '导入长截图（未装 OCR 依赖）';
+    [[
+      'chat-image', 'chat-image-label', 'chat-image-text'
+    ], [
+      'joker-chat-image', 'joker-chat-image-label', 'joker-chat-image-text'
+    ]].forEach(function (ids) {
+      var input = $(ids[0]);
+      if (!input) return;
+      var label = $(ids[1]);
+      input.disabled = !available;
+      if (label) {
+        label.classList.toggle('disabled', !available);
+        label.title = available ? '' : OCR_INSTALL_HINT;
+      }
+      var text = $(ids[2]);
+      if (text) text.textContent = available ? '导入长截图（可多选）' : '导入长截图（未装 OCR 依赖）';
+    });
   }
 
   async function selectContact(id) {
@@ -1496,6 +1507,369 @@ bindMetricTooltip(label, metricKey, metric);
     });
   }
 
+  // ------------------------------------------------------------ 小丑鉴定所
+
+  function initJoker() {
+    // 六征上方的全身马戏团小丑
+    var circusBox = document.querySelector('[data-joker-circus]');
+    if (circusBox && window.Clown) circusBox.innerHTML = window.Clown.circus();
+
+    $('joker-parse-text').addEventListener('click', function () { guard(jokerParseText); });
+    $('joker-clear-chat').addEventListener('click', function () {
+      jokerClearChat();
+      say('已清空本次内容。');
+    });
+
+    $('joker-sample-one').addEventListener('click', function () {
+      guard(async function () {
+        $('joker-chat-text').value = SAMPLES[0];
+        await jokerParseText();
+        say('已填入虚构示例，请核对双方对应关系。');
+      });
+    });
+    $('joker-sample-two').addEventListener('click', function () {
+      guard(async function () {
+        $('joker-chat-text').value = SAMPLES[1];
+        await jokerParseText();
+        say('已填入虚构示例，请核对双方对应关系。');
+      });
+    });
+
+    $('joker-chat-text').addEventListener('input', function () {
+      state.jokerMessages = [];
+      $('joker-speaker-panel').hidden = true;
+      $('joker-message-count').textContent = '文本变了，请重新辨认';
+    });
+
+    $('joker-chat-file').addEventListener('change', function () {
+      var input = this;
+      guard(async function () {
+        var file = input.files[0];
+        if (!file) return;
+        jokerClearChat();
+        if (file.size > 5 * 1024 * 1024) throw new Error('文件不能超过 5 MB');
+        var form = new FormData();
+        form.append('file', file);
+        var parsed = await api('/api/profiles/parse', { method: 'POST', body: form });
+        await jokerSetMessages(parsed.messages);
+        say('Excel 已解析。请核对「我 / 对方」。');
+      });
+    });
+
+    var imageLabel = $('joker-chat-image-label');
+    if (imageLabel) {
+      imageLabel.addEventListener('click', function (event) {
+        if (state.health && state.health.ocr_available === false) {
+          event.preventDefault();
+          say(OCR_INSTALL_HINT, true);
+        }
+      });
+    }
+    var imageInput = $('joker-chat-image');
+    if (imageInput) {
+      imageInput.addEventListener('change', function () {
+        var input = this;
+        guard(async function () {
+          var files = Array.prototype.slice.call(input.files || []);
+          if (!files.length) return;
+          jokerClearChat();
+          if (files.length > 20) throw new Error('一次最多 20 张截图，请分几次导入');
+          files.forEach(function (file) {
+            if (file.size > 20 * 1024 * 1024) throw new Error(file.name + ' 超过 20 MB');
+          });
+          var form = new FormData();
+          files.forEach(function (file) { form.append('files', file); });
+          loading(true, files.length > 1
+            ? ['正在读 ' + files.length + ' 张截图…', '把气泡摆回原位…', '接好每一段的缝…']
+            : ['正在读这一长条截图…', '把气泡摆回原位…', '认出说话的人…']);
+          var parsed;
+          try {
+            parsed = await api('/api/profiles/parse-image', { method: 'POST', body: form });
+          } finally {
+            loading(false);
+          }
+          await jokerSetOcrMessages(parsed.messages, parsed.warning, parsed.other_name);
+          say('已在本机识别 ' + (parsed.image_count || files.length) + ' 张截图，图片不会被保存。请逐条核对校对表，再点「开鉴」。');
+        });
+      });
+    }
+
+    $('joker-run-btn').addEventListener('click', function () { guard(jokerDetect); });
+    $('joker-close').addEventListener('click', function () {
+      $('joker-dialog').close();
+      window.Clown.stop();
+    });
+    $('joker-again').addEventListener('click', function () {
+      var dialog = $('joker-dialog');
+      window.Clown.start(dialog.dataset.level || 'suspicious', dialog.dataset.type || null);
+    });
+  }
+
+  function jokerClearChat() {
+    state.jokerMessages = [];
+    state.jokerOcrName = null;
+    $('joker-chat-text').value = '';
+    $('joker-chat-file').value = '';
+    if ($('joker-chat-image')) $('joker-chat-image').value = '';
+    $('joker-speaker-panel').hidden = true;
+    $('joker-ocr-review').hidden = true;
+    $('joker-ocr-table').replaceChildren();
+    $('joker-message-count').textContent = '';
+  }
+
+  async function jokerParseText() {
+    var lines = $('joker-chat-text').value.split(/\r?\n/).filter(function (line) { return line.trim(); });
+    if (!lines.length) throw new Error('先粘贴或输入一些聊天内容');
+    var messages = lines.map(function (line, i) {
+      var match = line.match(/^([^:：]{1,100})[:：]\s*(.+)$/);
+      if (!match) throw new Error('第 ' + (i + 1) + ' 行不是「发言者：内容」的格式');
+      return { speaker: match[1].trim(), content: match[2].trim() };
+    });
+    await jokerSetMessages(messages);
+  }
+
+  async function jokerSetMessages(messages) {
+    state.jokerMessages = [];
+    $('joker-speaker-panel').hidden = true;
+    $('joker-ocr-review').hidden = true;
+    var speakers = [];
+    messages.forEach(function (m) { if (speakers.indexOf(m.speaker) < 0) speakers.push(m.speaker); });
+    if (speakers.length !== 2) {
+      throw new Error('需要明确的两位发言者：群聊请先整理，或检查「发言者：内容」格式');
+    }
+    state.jokerMessages = messages;
+    ['joker-self-speaker', 'joker-other-speaker'].forEach(function (id) {
+      var select = $(id);
+      select.replaceChildren();
+      speakers.forEach(function (s) {
+        var option = el('option', '', s);
+        option.value = s;
+        select.append(option);
+      });
+    });
+    $('joker-self-speaker').value = speakers.indexOf('我') >= 0 ? '我' : speakers[0];
+    $('joker-other-speaker').value = speakers.filter(function (s) { return s !== $('joker-self-speaker').value; })[0];
+    $('joker-message-count').textContent = '已认出 ' + messages.length + ' 条消息，请核对双方';
+    $('joker-speaker-panel').hidden = false;
+  }
+
+  async function jokerSetOcrMessages(messages, warning, otherName) {
+    state.jokerMessages = messages.map(function (message) {
+      return {
+        speaker: message.speaker === '我' ? '我' : '对方',
+        content: message.content,
+        time: message.time || '',
+        time_guessed: !!message.time_guessed,
+        kind: message.kind || 'text',
+        emoji_emotion: message.emoji_emotion || '',
+        image: message.image || null,
+        open: false
+      };
+    });
+    state.jokerOcrName = otherName || null;
+    ['joker-self-speaker', 'joker-other-speaker'].forEach(function (id) {
+      var select = $(id);
+      select.replaceChildren();
+      jokerSpeakerOptions().forEach(function (pair) {
+        var option = el('option', '', pair[1]);
+        option.value = pair[0];
+        select.append(option);
+      });
+    });
+    $('joker-self-speaker').value = '我';
+    $('joker-other-speaker').value = '对方';
+    $('joker-speaker-panel').hidden = false;
+    renderJokerOcrReview(warning);
+    $('joker-message-count').textContent = '已识别 ' + state.jokerMessages.length + ' 条，请逐条核对';
+  }
+
+  function jokerSpeakerOptions() {
+    return [['我', '我'], ['对方', state.jokerOcrName || '对方']];
+  }
+
+  function jokerDisplayName(speaker) {
+    return speaker === '对方' ? (state.jokerOcrName || '对方') : '我';
+  }
+
+  function renderJokerOcrReview(warning) {
+    $('joker-ocr-note').textContent = warning ||
+      '识别结果仅供参考：文字默认折叠，点「展开」可改字、切换发言者；图片与表情常展开。标「推测」的时间来自最近的一个可见时间分隔。';
+    var table = $('joker-ocr-table');
+    table.replaceChildren();
+    state.jokerMessages.forEach(function (message, index) {
+      var visual = isVisualKind(message.kind);
+      var expanded = visual || !!message.open;
+      var row = el('div', 'ocr-row' + (expanded ? '' : ' closed'));
+      row.dataset.kind = message.kind || 'text';
+
+      var head = el('div', 'ocr-row-head');
+      head.append(el('span', 'ocr-index', String(index + 1)));
+      if (visual) {
+        head.append(labeledSelect(jokerSpeakerOptions(), message.speaker, function (value) {
+          message.speaker = value;
+        }, '这条是谁说的'));
+        head.append(labeledSelect(OCR_KINDS, message.kind, function (value) {
+          applyKindChange(message, value);
+          renderJokerOcrReview(warning);
+        }, '消息类型'));
+        head.append(labeledSelect(emotionOptions(message), message.emoji_emotion || '', function (value) {
+          message.emoji_emotion = value;
+        }, '表情情绪（可自动或手选）'));
+      } else {
+        var summary = el('button', 'ocr-summary');
+        summary.type = 'button';
+        summary.title = expanded ? '点击收起修改' : '点击展开修改';
+        summary.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        summary.append(el('span', 'ocr-speaker', jokerDisplayName(message.speaker)));
+        summary.append(el('span', 'ocr-meta', kindLabel(message.kind) + ' · ' + timeLabel(message)));
+        summary.append(el('span', 'ocr-preview', message.content));
+        summary.addEventListener('click', function () {
+          message.open = !message.open;
+          renderJokerOcrReview(warning);
+        });
+        head.append(summary);
+      }
+      var remove = el('button', 'line-btn quiet ocr-del', '删除');
+      remove.type = 'button';
+      remove.addEventListener('click', function () {
+        state.jokerMessages.splice(index, 1);
+        renderJokerOcrReview(warning);
+        $('joker-message-count').textContent = '已识别 ' + state.jokerMessages.length + ' 条，请逐条核对';
+      });
+      head.append(remove);
+      row.append(head);
+
+      if (expanded) {
+        var body = el('div', 'ocr-row-body');
+        if (visual && message.image) {
+          var thumb = document.createElement('img');
+          thumb.className = 'ocr-thumb';
+          thumb.src = message.image;
+          thumb.alt = kindLabel(message.kind);
+          thumb.title = '点击查看大图';
+          thumb.addEventListener('click', function () { openImageView(message.image); });
+          body.append(thumb);
+        }
+        if (!visual) {
+          var controls = el('div', 'ocr-row-controls');
+          controls.append(labeledSelect(jokerSpeakerOptions(), message.speaker, function (value) {
+            message.speaker = value;
+          }, '这条是谁说的'));
+          controls.append(labeledSelect(OCR_KINDS, message.kind || 'text', function (value) {
+            applyKindChange(message, value);
+            renderJokerOcrReview(warning);
+          }, '消息类型'));
+          body.append(controls);
+        }
+        var content = document.createElement('input');
+        content.type = 'text';
+        content.className = 'ocr-content';
+        content.value = message.content;
+        content.placeholder = '消息内容';
+        content.addEventListener('input', function () {
+          message.content = content.value;
+        });
+        body.append(content);
+
+        var foot = el('div', 'ocr-row-foot');
+        var time = document.createElement('input');
+        time.type = 'text';
+        time.className = 'ocr-time';
+        time.value = message.time || '';
+        time.placeholder = '时间（可空）';
+        time.addEventListener('input', function () {
+          message.time = time.value;
+          message.time_guessed = false;
+          updateTimeBadge(foot, message);
+        });
+        foot.append(time);
+        updateTimeBadge(foot, message);
+        if (!visual) {
+          var collapse = el('button', 'line-btn quiet ocr-collapse', '收起');
+          collapse.type = 'button';
+          collapse.addEventListener('click', function () {
+            message.open = false;
+            renderJokerOcrReview(warning);
+          });
+          foot.append(collapse);
+        }
+        body.append(foot);
+        row.append(body);
+      }
+      table.append(row);
+    });
+    $('joker-ocr-review').hidden = false;
+  }
+
+  async function jokerDetect() {
+    var messages = state.jokerMessages || [];
+    if (!messages.length) throw new Error('还没有可分析的聊天：先「辨认说话的人」、导入截图或选一个示例');
+    if ($('joker-self-speaker').value === $('joker-other-speaker').value) {
+      throw new Error('「我」和「对方」不能是同一个人');
+    }
+    loading(true, ['正在数谁先开的口…', '称一称字数的轻重…', '翻一翻六征…']);
+    var result;
+    try {
+      result = await api('/api/analyze/joker/detect', {
+        method: 'POST',
+        body: JSON.stringify({
+          messages: messages.map(function (m) {
+            var message = { speaker: m.speaker, content: m.content };
+            if (m.emoji_emotion) message.emotion = m.emoji_emotion;
+            return message;
+          }),
+          self_speaker: $('joker-self-speaker').value,
+          other_speaker: $('joker-other-speaker').value
+        })
+      });
+    } finally {
+      loading(false);
+    }
+    renderJokerDialog(result);
+  }
+
+  function renderJokerDialog(result) {
+    var dialog = $('joker-dialog');
+    dialog.dataset.level = result.level;
+    dialog.dataset.type = result.type || '';
+    $('joker-dialog-title').textContent = result.is_joker
+      ? '确诊：' + result.type
+      : '清醒玩家';
+    $('joker-dialog-seal-text').textContent = result.is_joker ? result.type.replace('型', '') : '清醒';
+    $('joker-dialog-desc').textContent = result.is_joker && result.type_info
+      ? result.type_info.desc
+      : '这段聊天里双方投入大致对等，没有出现明显的小丑状态。认真喜欢一个人不丢人，继续保持清醒。';
+    $('joker-dialog-suggestion').textContent = result.is_joker && result.type_info
+      ? '建议 · ' + result.type_info.suggestion
+      : '';
+
+    var box = $('joker-signs');
+    box.replaceChildren();
+    var order = ['one_way', 'self_moved', 'fantasy', 'boundary', 'no_accept_reject', 'self_mockery'];
+    order.forEach(function (key) {
+      var s = result.signs[key];
+      if (!s) return;
+      var row = el('div', 'sign-row' + (s.hit ? ' hit' : ''));
+      row.append(el('span', 'sign-badge', s.hit ? '命中' : '未中'));
+      row.append(el('span', 'sign-label', s.label));
+      row.append(el('span', 'sign-detail', s.detail || ''));
+      box.append(row);
+    });
+
+    // 右上角静态小丑：按类型放置对应形象
+    var fig = $('joker-dialog-figure');
+    if (fig) {
+      fig.innerHTML = window.Clown
+        ? window.Clown.bust(result.is_joker ? result.type : null)
+        : '';
+    }
+
+    if (result.is_joker) {
+      window.Clown.start(result.level, result.type);
+    }
+    dialog.showModal();
+  }
+
   // ------------------------------------------------------------ 配乐
 
   var TYPE_MUSIC = { '殉道型': '过火', '镜像型': '一直很安静', '弄臣型': '怪咖', '幻恋型': '水星记' };
@@ -2248,6 +2622,7 @@ bindMetricTooltip(label, metricKey, metric);
     initConfig();
     initMusic();
     initFisherman();
+    initJoker();
     renderTheory();
     // 云端与长文默认都关掉，由用户自己打开
     $('include-guidance').checked = false;

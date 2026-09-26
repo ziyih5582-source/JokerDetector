@@ -41,7 +41,10 @@
       <button type="button" data-go="guide" title="第一次用？一分钟看懂全部功能与隐私边界">使用说明</button>
       <i aria-hidden="true"></i>
       <button type="button" data-go="config" title="云端 AI 状态、湖面动画与背景音乐">设置</button>
+      <i aria-hidden="true"></i>
+      <button type="button" data-go="joker" class="nav-joker" title="小丑鉴定所：用六征量一量自己">小丑鉴定所<span class="nav-ping" aria-hidden="true"></span></button>
     </nav>
+
   </header>
 
   <main class="stage">
@@ -223,6 +226,72 @@
           <button type="button" id="run-btn" class="seal-btn wide">开始分析</button>
           <p class="note" id="ai-status">正在读取服务状态…</p>
           <p class="note">按下之后结果会出现在「分析结果」一页。没有 API Key 也能用：本地统计与喜好提取全程不联网。</p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ==================================================================
+         小丑鉴定所 · 六征判定
+         ================================================================== -->
+    <section class="view" data-view="joker">
+      <div class="lede joker-lede">
+        <span class="eyebrow">小丑鉴定所 · 六征</span>
+        <h2>敢不敢量一量自己？</h2>
+        <p>这里说的「小丑」不是骂人，而是一种关系状态：明知对方不够喜欢自己，仍靠单方面付出、自我感动和幻想维持关系。认真喜欢一个人不丢人；只有长期不对等、失去边界、明知不可为而为之，才算陷入这种状态。判定全程在本机完成，不调用云端 AI。</p>
+      </div>
+
+      <div class="grid">
+        <div class="col-main">
+          <label class="field-label" for="joker-chat-text">聊天记录</label>
+          <textarea id="joker-chat-text" rows="8" spellcheck="false"
+            placeholder="我：在忙吗？&#10;对方：有点&#10;我：那你忙完记得找我"></textarea>
+
+          <div class="line-actions">
+            <button type="button" id="joker-parse-text" class="line-btn">辨认说话的人</button>
+            <label class="line-btn" for="joker-chat-file">导入 Excel
+              <input id="joker-chat-file" type="file" accept=".xlsx,.xls" hidden>
+            </label>
+            <label class="line-btn" id="joker-chat-image-label" for="joker-chat-image"><span id="joker-chat-image-text">导入长截图（可多选）</span>
+              <input id="joker-chat-image" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
+            </label>
+            <button type="button" id="joker-sample-one" class="line-btn quiet">填入示例一</button>
+            <button type="button" id="joker-sample-two" class="line-btn quiet">填入示例二</button>
+            <button type="button" id="joker-clear-chat" class="line-btn quiet">清空</button>
+            <span id="joker-message-count" class="note"></span>
+          </div>
+
+          <div id="joker-speaker-panel" hidden>
+            <div class="two-up">
+              <div>
+                <label class="field-label" for="joker-self-speaker">我（自己）</label>
+                <select id="joker-self-speaker"></select>
+              </div>
+              <div>
+                <label class="field-label" for="joker-other-speaker">对方</label>
+                <select id="joker-other-speaker"></select>
+              </div>
+            </div>
+          </div>
+
+          <div id="joker-ocr-review" hidden>
+            <p class="note" id="joker-ocr-note"></p>
+            <div id="joker-ocr-table" class="ocr-table"></div>
+          </div>
+        </div>
+
+        <aside class="col-side">
+          <div class="joker-aside-figure" data-joker-circus aria-hidden="true"></div>
+          <h3 class="block-title"><span>征</span>六征</h3>
+          <ul class="joker-sign-list">
+            <li>单向性：全靠你推进</li>
+            <li>自我感动：付出换爱</li>
+            <li>幻想性：脑补暧昧</li>
+            <li>边界失守：牺牲自我</li>
+            <li>不接受拒绝：还在等</li>
+            <li>事后自嘲：小丑是我</li>
+          </ul>
+          <p class="note">单向 + 至少另一项，且综合分过线才会判定；只是认真喜欢一个人，不会被误伤。</p>
+          <button type="button" id="joker-run-btn" class="seal-btn wide joker-run">开 鉴</button>
         </aside>
       </div>
     </section>
@@ -440,7 +509,7 @@
         </div>
       </div>
 
-      <h3 class="block-title"><span>三</span>七个页面各管什么</h3>
+      <h3 class="block-title"><span>三</span>八个页面各管什么</h3>
       <div class="panels" id="guide-panels">
         <div class="panel">
           <h4>首页</h4>
@@ -469,6 +538,10 @@
         <div class="panel">
           <h4>设置</h4>
           <p>查看云端 AI 是否就绪（密钥放在服务端项目根目录 <code>.env</code> 的 <code>DEEPSEEK_API_KEY</code> 里，页面只显示状态），以及湖面动画、撒食与背景音乐。</p>
+        </div>
+        <div class="panel">
+          <h4>小丑鉴定所</h4>
+          <p>一次快速自测：把定义里的六个特征（单向性、自我感动、幻想性、边界失守、不接受拒绝、事后自嘲）拆成「六征」逐条核对。单向性 + 其余至少一项命中、综合分过线才算小丑，纯本地判定、不调云端、不写档案。判定为小丑时会弹出类型弹窗，并把该类型的专属小丑洒满屏幕。</p>
         </div>
       </div>
 
@@ -604,10 +677,67 @@
   </div>
 </dialog>
 
+<!-- 小丑鉴定所入口：经典马戏团小丑全身像，固定在整屏最右侧（仅首页显示）。
+     放在 body 末尾，确保任何首页内容都不会盖住它。 -->
+<button type="button" class="joker-seal" data-go="joker" aria-label="进入小丑鉴定所">
+  <span class="joker-seal-figure" aria-hidden="true">
+    <svg width="100%" height="100%" viewBox="0 0 120 230" preserveAspectRatio="xMidYMid meet" role="img" aria-label="经典马戏团小丑">
+      <ellipse cx="60" cy="216" rx="42" ry="8" fill="rgba(35,33,32,.10)"/>
+      <circle cx="60" cy="10" r="6" fill="#e2c04a"/>
+      <path d="M60 14 L42 52 L78 52 Z" fill="#cf3b2a"/>
+      <rect x="38" y="50" width="44" height="7" rx="3.5" fill="#b03028"/>
+      <circle cx="30" cy="62" r="9" fill="#e2a33c"/>
+      <circle cx="90" cy="62" r="9" fill="#e2a33c"/>
+      <circle cx="60" cy="66" r="30" fill="#fffdf8" stroke="#232120" stroke-width="2.2"/>
+      <circle cx="48" cy="60" r="3.6" fill="#232120"/><circle cx="72" cy="60" r="3.6" fill="#232120"/>
+      <circle cx="49" cy="59" r="1.2" fill="#fff"/><circle cx="73" cy="59" r="1.2" fill="#fff"/>
+      <ellipse cx="42" cy="74" rx="6" ry="4" fill="rgba(214,106,82,.35)"/>
+      <ellipse cx="78" cy="74" rx="6" ry="4" fill="rgba(214,106,82,.35)"/>
+      <circle cx="60" cy="68" r="8" fill="#cf3b2a"/><circle cx="57" cy="65" r="2.6" fill="#ff9a80"/>
+      <path d="M42 78 Q60 98 78 78" fill="none" stroke="#b03028" stroke-width="3.4" stroke-linecap="round"/>
+      <path d="M40 96 q10 10 20 0 q10 10 20 0" fill="none" stroke="#e2c04a" stroke-width="4"/>
+      <path d="M60 96 l-12 -6 v12 Z" fill="#3a6ea5"/><path d="M60 96 l12 -6 v12 Z" fill="#3a6ea5"/>
+      <circle cx="60" cy="96" r="3.2" fill="#2b2724"/>
+      <path d="M40 100 h40 q8 30 6 62 h-52 q-2 -32 6 -62 Z" fill="#3a6ea5"/>
+      <circle cx="50" cy="120" r="3" fill="#fffdf8" opacity=".85"/>
+      <circle cx="70" cy="128" r="3" fill="#fffdf8" opacity=".85"/>
+      <circle cx="54" cy="142" r="3" fill="#fffdf8" opacity=".85"/>
+      <circle cx="72" cy="150" r="3" fill="#fffdf8" opacity=".85"/>
+      <circle cx="46" cy="156" r="3" fill="#fffdf8" opacity=".85"/>
+      <path d="M42 106 Q22 96 16 76" fill="none" stroke="#cf3b2a" stroke-width="9" stroke-linecap="round"/>
+      <circle cx="15" cy="72" r="7" fill="#fffdf8" stroke="#232120" stroke-width="1.6"/>
+      <path d="M78 106 Q96 124 96 146" fill="none" stroke="#cf3b2a" stroke-width="9" stroke-linecap="round"/>
+      <circle cx="96" cy="150" r="7" fill="#fffdf8" stroke="#232120" stroke-width="1.6"/>
+      <rect x="42" y="162" width="11" height="34" rx="5" fill="#cf3b2a"/>
+      <rect x="67" y="162" width="11" height="34" rx="5" fill="#cf3b2a"/>
+      <ellipse cx="46" cy="200" rx="15" ry="9" fill="#2b2724"/>
+      <ellipse cx="74" cy="200" rx="15" ry="9" fill="#2b2724"/>
+    </svg>
+  </span>
+  <span class="joker-seal-text">小丑<br>鉴定所</span>
+  <span class="joker-seal-hint">敢不敢量一量自己？</span>
+</button>
+
 <audio id="music-audio" loop preload="none"></audio>
+
+<dialog id="joker-dialog" class="joker-dialog">
+  <div class="joker-dialog-figure" id="joker-dialog-figure" aria-hidden="true"></div>
+  <div class="joker-dialog-head">
+    <h2 id="joker-dialog-title">确诊</h2>
+    <div class="seal-type joker-dialog-seal"><span id="joker-dialog-seal-text"></span></div>
+  </div>
+  <p class="big-quote" id="joker-dialog-desc"></p>
+  <p class="note" id="joker-dialog-suggestion"></p>
+  <div class="joker-signs" id="joker-signs"></div>
+  <div class="line-actions">
+    <button type="button" id="joker-again" class="line-btn quiet">再看一遍头像</button>
+    <button type="button" id="joker-close" class="seal-btn">我知道了，先爱自己</button>
+  </div>
+</dialog>
 
 <script src="/static/js/theory.js"></script>
 <script src="/static/js/pond.js"></script>
+<script src="/static/js/clown.js"></script>
 <script src="/static/js/ink.js"></script>
 </body>
 </html>

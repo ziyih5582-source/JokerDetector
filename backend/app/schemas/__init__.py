@@ -3,7 +3,7 @@
 
 from app.schemas.base import StrictModel
 from app.schemas.fisherman import ChatInput, ContextInput, Turn
-from app.schemas.profiles import AnalyzeInput, ContactInput, FactEdit, Message, UnifiedInput
+from app.schemas.profiles import AnalyzeInput, ContactInput, FactEdit, JokerDetectInput, Message, UnifiedInput
 from app.schemas.system import AIConfigInfo
 
 __all__ = [
@@ -14,6 +14,7 @@ __all__ = [
     "ContactInput",
     "ContextInput",
     "FactEdit",
+    "JokerDetectInput",
     "Message",
     "Turn",
     "UnifiedInput",

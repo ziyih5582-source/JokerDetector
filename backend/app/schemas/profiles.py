@@ -46,3 +46,11 @@ class UnifiedInput(StrictModel):
     save_consent: bool = False
     use_ai: bool = False
     include_guidance: bool = False
+
+
+class JokerDetectInput(StrictModel):
+    """小丑鉴定所：纯本地「六征」判定，不触发任何云端调用。"""
+
+    messages: list[Message] = Field(min_length=2, max_length=config.MAX_ROWS)
+    self_speaker: str = Field(min_length=1, max_length=100)
+    other_speaker: str = Field(min_length=1, max_length=100)

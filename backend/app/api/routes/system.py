@@ -147,7 +147,7 @@ async def guide():
             }
             for key in METRIC_DOCS
         ],
-        "type_rule": "取五维里数值最高的那一项：连续发送→幻恋型，衔接度→镜像型，低姿态→弄臣型，其余→殉道型。",
+        "type_rule": "谈心分析按五维里数值最高的那一项定类型：连续发送→幻恋型，衔接度→镜像型，低姿态→弄臣型，其余→殉道型；小丑鉴定所则按「六征」里得分最高的一项定类型（另有守候型、单向型）。",
         "types": JOKER_TYPES,
         "not_joker_desc": NOT_JOKER_DESC,
         "limits": {
