@@ -138,9 +138,11 @@
 
   function busy(on) {
     state.busy = on;
+    if (on && window.AnalysisSpeech) window.AnalysisSpeech.stop();
     var controls = document.querySelectorAll('button, input, select, textarea');
     Array.prototype.forEach.call(controls, function (c) { c.disabled = on; });
     if (!on) { syncOptions(); }
+    if (window.AnalysisSpeech) window.AnalysisSpeech.sync(on);
   }
 
   async function api(path, options) {
@@ -178,6 +180,7 @@
   }
 
   function go(view) {
+    if (view !== 'result' && window.AnalysisSpeech) window.AnalysisSpeech.stop();
     document.body.dataset.view = view;
     setHere(view);
     if (view === 'theory') renderTheory();
@@ -957,6 +960,7 @@
       renderCompare(data.statistics);
 
       var guidanceBlock = $('guidance-block');
+      if (window.AnalysisSpeech) window.AnalysisSpeech.setText(data.guidance || '');
       if (data.guidance) {
         guidanceBlock.hidden = false;
         $('guidance-title').textContent = 'AI 情感分析长文';

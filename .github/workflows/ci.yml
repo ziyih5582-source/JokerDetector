@@ -5,6 +5,21 @@ on:
   pull_request:
 
 jobs:
+  frontend:
+    name: 朗读功能测试
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: JavaScript 语法检查
+        run: |
+          node --check frontend/js/speech.js
+          node --check frontend/js/ink.js
+      - name: 朗读状态与长文测试
+        run: node --test frontend/tests/speech.test.cjs
+
   backend:
     name: 后端测试
     runs-on: ubuntu-latest

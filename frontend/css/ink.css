@@ -473,6 +473,16 @@ body[data-view="guide"] .view[data-view="guide"] { display: block; }
 .lede p { margin: 0; color: var(--ink-mid); font-size: 14.5px; }
 
 /* 板块标题：一个朱砂字 + 一条延伸的细线（线条引导） */
+.guidance-speech {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 18px;
+  margin-top: 18px;
+}
+.guidance-speech[hidden] { display: none; }
+.guidance-speech .note { margin: 0; flex: 1 1 240px; }
+
 .block-title {
   display: flex;
   align-items: center;

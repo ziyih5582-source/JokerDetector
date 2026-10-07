@@ -347,6 +347,11 @@
       <section class="block" id="guidance-block" hidden>
         <h3 class="block-title"><span>书</span><span id="guidance-title">AI 情感分析长文</span></h3>
         <div class="long-text" id="guidance-content"></div>
+        <div class="guidance-speech" id="guidance-speech" hidden>
+          <button type="button" class="line-btn quiet" id="guidance-speech-toggle"
+                  aria-controls="guidance-content" aria-pressed="false" disabled>播放朗读</button>
+          <span class="note" id="guidance-speech-status" role="status" aria-live="polite"></span>
+        </div>
       </section>
 
       <div class="line-actions">
@@ -738,6 +743,7 @@
 <script src="/static/js/theory.js"></script>
 <script src="/static/js/pond.js"></script>
 <script src="/static/js/clown.js"></script>
+<script src="/static/js/speech.js"></script>
 <script src="/static/js/ink.js"></script>
 </body>
 </html>
