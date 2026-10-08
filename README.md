@@ -6,6 +6,10 @@
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 ![Status](https://img.shields.io/badge/Status-Fun%20%26%20WIP-orange.svg)
 
+团队新成员可先读 [Windows 小白协作手册](docs/BEGINNER_GUIDE.md)：克隆、启动、分支、提交、PR 与常见问题。人物档案下一步的设计提案见 [档案升级路线](docs/PROFILE_ROADMAP.md)。
+
+AI 情感分析长文生成后，正文下方新增「播放朗读 / 停止朗读」，使用浏览器/设备语音，不增加项目 API 用量。长文分段连续播放；切页、新报告或页面退到后台会停止。音色随设备而异，部分语音可能联网；不支持的浏览器会显示说明。
+
 ---
 
 ## 本次更新：小丑鉴定所（六征判定 + 六型形象）
