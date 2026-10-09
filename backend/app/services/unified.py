@@ -34,6 +34,9 @@ def run_unified(
     use_ai: bool = False,
     include_guidance: bool = False,
     source: str = "本次聊天片段",
+    profile_engine: str = "legacy",
+    chat_date: str | None = None,
+    scene: str = "",
 ) -> dict:
     """融合入口。
 
@@ -58,7 +61,28 @@ def run_unified(
     warning = None
     mode = "ai" if use_ai else "local"
 
-    if contact_id:
+    memory_changes = []
+    if contact_id and profile_engine == "communication":
+        from app.services.communication_flow import import_memory
+        store = store_factory()
+        existing = call(store.get,contact_id)
+        try:
+            memory = import_memory(store,contact_id,prepared,chat_date=chat_date,scene=scene,use_ai=use_ai,
+                                   client=analyzer.client,model=analyzer.ai_model)
+            profile=memory["profile"]
+            duplicate=memory["duplicate"]
+            profile_updated=memory["profile_updated"]
+            memory_changes=memory["changes"]
+            report_regenerated=duplicate and want_report
+            if not use_ai:
+                warning=memory["notice"]
+        except HTTPException as exc:
+            if exc.status_code==404:
+                raise
+            profile=public_profile(call(store.get,contact_id))
+            warning=str(exc.detail)+"；聊天统计仍可查看，档案未写入过期或失败结果"
+            mode="memory_failed"
+    elif contact_id:
         store = store_factory()
         existing = call(store.get, contact_id)
         fingerprint = store.digest(prepared)
@@ -101,7 +125,7 @@ def run_unified(
         allow_ai=False,
     )
     if want_report:
-        if mode == "local_fallback":
+        if mode in {"local_fallback", "memory_failed"}:
             # 云端提取已失败，不再追加第二次必然失败的调用。
             result["guidance_error"] = warning
         else:
@@ -114,7 +138,7 @@ def run_unified(
     else:
         analysis = build_report(result, source)
 
-    return {
+    response = {
         "analysis": analysis,
         "profile": profile,
         "duplicate": duplicate,
@@ -122,3 +146,6 @@ def run_unified(
         "profile_updated": profile_updated,
         "warning": warning,
     }
+    if profile_engine=="communication":
+        response["memory_changes"]=memory_changes
+    return response

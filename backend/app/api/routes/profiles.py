@@ -21,6 +21,12 @@ from app.schemas import AnalyzeInput, ContactInput, FactEdit, Message
 from app.services import ocr
 from app.services.profiles import prepare_messages, public_profile
 from app.services.unified import run_unified
+from app.schemas.dossier import ContactDetails, DossierImport, ImportCommit, ManualFact
+from app.services import dossier
+from app.services.profiles import ai_error_detail
+from app.schemas.communication import MemoryCommit, MemoryImport, MemoryNote, MemoryResolution
+from app.services import communication
+from app.services.communication_flow import import_memory, recognize
 
 router = APIRouter(prefix="/api/profiles", tags=["联系人档案（实验）"])
 
@@ -42,6 +48,121 @@ def create_contact(body: ContactInput):
 @router.get("/contacts/{contact_id}")
 def contact(contact_id: str):
     return public_profile(call(get_store().get, contact_id))
+
+
+@router.post("/contacts/{contact_id}/memory/preview")
+def preview_memory(contact_id: str, body: MemoryImport):
+    if body.role_reliability!="confirmed":
+        raise HTTPException(400,"请先核对自己和对方的归属，暂不提炼人物信息")
+    if body.source_kind=="ai_summary":
+        return {"token":None,"changes":[],"duplicate":False,"revision":call(get_store().get,contact_id)["revision"],
+                "rejected_count":0,"notice":"AI摘要只能用于比较，不能作为新的本人原文依据"}
+    if body.use_ai and not body.cloud_consent:
+        raise HTTPException(400,"请确认将脱敏聊天与必要的非私人背景交给当前AI服务")
+    messages,chat_date,scene=call(dossier.prepare_import,body.model_dump(mode="json"))
+    if body.time_reliability!="confirmed":
+        chat_date=None
+    result=recognize(get_store(),contact_id,messages,revision=body.revision,chat_date=chat_date,scene=scene,
+                     use_ai=body.use_ai,client=analyzer.client,model=analyzer.ai_model)
+    result.pop("empty_metadata",None)
+    return result
+
+
+@router.post("/contacts/{contact_id}/memory/commit")
+def commit_memory(contact_id: str, body: MemoryCommit):
+    if not body.save_consent:
+        raise HTTPException(400,"请先确认保存本次沟通信息")
+    return public_profile(call(communication.commit,get_store(),contact_id,body.token))
+
+
+@router.post("/contacts/{contact_id}/memory/import")
+def update_memory(contact_id: str, body: MemoryImport):
+    if not body.save_consent or (body.use_ai and not body.cloud_consent):
+        raise HTTPException(400,"请确认保存；使用云端时还需确认发送脱敏资料")
+    if body.role_reliability!="confirmed":
+        raise HTTPException(400,"请先核对自己和对方的归属，暂不提炼人物信息")
+    if body.source_kind=="ai_summary":
+        return {"profile":public_profile(call(get_store().get,contact_id)),"changes":[],"duplicate":False,"profile_updated":False,
+                "rejected_count":0,"notice":"AI摘要不作为新证据，档案保持原有内容"}
+    messages,chat_date,scene=call(dossier.prepare_import,body.model_dump(mode="json"))
+    if body.time_reliability!="confirmed":
+        chat_date=None
+    return import_memory(get_store(),contact_id,messages,revision=body.revision,chat_date=chat_date,scene=scene,
+                         use_ai=body.use_ai,client=analyzer.client,model=analyzer.ai_model)
+
+
+@router.post("/contacts/{contact_id}/memory/notes")
+def memory_note(contact_id: str, body: MemoryNote):
+    return public_profile(call(communication.save_note,get_store(),contact_id,body.revision,body.text,body.fact_id,body.use_in_ai))
+
+
+@router.post("/contacts/{contact_id}/memory/{fact_id}/resolve")
+def resolve_memory(contact_id: str, fact_id: str, body: MemoryResolution):
+    return public_profile(call(communication.resolve, get_store(), contact_id, fact_id, body.revision, body.decision))
+
+
+@router.patch("/contacts/{contact_id}")
+def contact_details(contact_id: str, body: ContactDetails):
+    return public_profile(call(dossier.update_contact, get_store(), contact_id, body.model_dump()))
+
+
+@router.post("/contacts/{contact_id}/facts", status_code=201)
+def add_manual_fact(contact_id: str, body: ManualFact):
+    return public_profile(call(dossier.manual_fact, get_store(), contact_id, body.model_dump(mode="json")))
+
+
+@router.put("/contacts/{contact_id}/facts/{fact_id}")
+def correct_manual_fact(contact_id: str, fact_id: str, body: ManualFact):
+    return public_profile(call(dossier.manual_fact, get_store(), contact_id, body.model_dump(mode="json"), fact_id))
+
+
+@router.post("/contacts/{contact_id}/imports/redact")
+def redact_import(contact_id: str, body: DossierImport):
+    p = call(get_store().get, contact_id)
+    call(dossier.check_revision, p, body.revision)
+    messages, chat_date, scene = call(dossier.prepare_import, body.model_dump(mode="json"))
+    return {"messages": messages, "chat_date": chat_date, "scene": scene}
+
+
+@router.post("/contacts/{contact_id}/imports/preview")
+def dossier_preview(contact_id: str, body: DossierImport):
+    store = get_store()
+    p = call(store.get, contact_id)
+    call(dossier.check_revision, p, body.revision)
+    messages, chat_date, scene = call(dossier.prepare_import, body.model_dump(mode="json"))
+    metadata, duplicate, overlap = dossier.import_metadata(store, p, messages, chat_date, scene)
+    if duplicate:
+        return {"revision": p["revision"], "changes": [], "duplicate": True, "token": None, "overlap_count": len(messages)}
+    dropped = 0
+    if body.use_ai:
+        if not body.cloud_consent:
+            raise HTTPException(400, "请先确认将脱敏聊天和已有非人工摘要发送给云端 AI")
+        if analyzer.client is None:
+            raise HTTPException(400, "尚未配置 AI，请先在设置中配置服务端 API Key，或取消云端选项使用本地提炼")
+        try:
+            candidates, dropped = dossier.extract_cloud_dossier(messages, p, analyzer.client, analyzer.ai_model, chat_date, scene)
+        except ValueError as exc:
+            detail = ai_error_detail(exc)
+            raise HTTPException(400, detail["message"]) from None
+        except Exception as exc:
+            detail = ai_error_detail(exc)
+            raise HTTPException(502, detail["message"] + "；旧档案未改变，可以重试或改用本地提炼") from None
+    else:
+        candidates = dossier.extract_local_dossier(messages, chat_date, scene)
+    changes = dossier.plan_changes(store, p, candidates, metadata, overlap)
+    metadata["overlap_ids"] = sorted(overlap)
+    preview = dossier.make_preview(store, p, metadata, changes, "ai" if body.use_ai else "local")
+    preview["dropped_count"] = dropped
+    preview["notice"] = "本地模式只支持少量明确表达，完整语义提炼请选择云端 AI。" if not body.use_ai else "AI 提炼仍可能误解，请检查来源与更新范围。"
+    return preview
+
+
+@router.post("/contacts/{contact_id}/imports/commit")
+def dossier_commit(contact_id: str, body: ImportCommit):
+    if not body.save_consent:
+        raise HTTPException(400, "保存前请确认将勾选信息写入本机加密档案")
+    p = call(dossier.commit_import, get_store(), contact_id, body.token, body.selected_ids)
+    return public_profile(p)
 
 
 @router.delete("/contacts/{contact_id}")
@@ -211,6 +332,9 @@ def analyze(contact_id: str, body: AnalyzeInput):
         save_consent=body.save_consent,
         use_ai=body.use_ai,
         include_guidance=body.include_guidance,
+        profile_engine=body.profile_engine,
+        chat_date=body.chat_date.isoformat() if body.chat_date else None,
+        scene=body.scene,
     )
     return {
         "profile": result["profile"],

@@ -88,6 +88,7 @@ def make_contact_with_facts(client, name="小林"):
                      {"speaker": "小林", "content": "我的电话是13812345678"}],
         "self_speaker": "我", "other_speaker": "小林",
         "contact_id": contact_id, "save_consent": True,
+        "profile_engine": "legacy",  # These assertions cover old profile compatibility.
     }
     client.post("/api/analyze/unified", json=payload)
     return contact_id

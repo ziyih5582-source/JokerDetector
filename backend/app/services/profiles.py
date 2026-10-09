@@ -228,9 +228,15 @@ class ProfileStore:
         row = db.execute("SELECT payload FROM contacts WHERE id=?", (contact_id,)).fetchone()
         if row is None:
             raise KeyError("联系人不存在或已删除")
-        return json.loads(self.cipher.decrypt(row[0]))
+        from app.services.dossier import migrate
+        from app.services.communication import migrate as migrate_memory
+        return migrate_memory(migrate(json.loads(self.cipher.decrypt(row[0]))))
 
     def _write(self, db, profile):
+        from app.services.dossier import migrate
+        from app.services.communication import migrate as migrate_memory
+        migrate(profile)
+        migrate_memory(profile)
         payload = self.cipher.encrypt(json.dumps(profile, ensure_ascii=False).encode())
         db.execute("INSERT OR REPLACE INTO contacts VALUES (?,?)", (profile["id"], payload))
 
@@ -238,8 +244,12 @@ class ProfileStore:
         name = name.strip()
         if not name:
             raise ValueError("请输入联系人称呼")
-        profile = {"schema_version": 1, "id": uuid.uuid4().hex, "name": name, "created_at": now(), "updated_at": now(),
+        profile = {"schema_version": 2, "id": uuid.uuid4().hex, "name": name, "created_at": now(), "updated_at": now(),
                    "revision": 0, "facts": [], "batches": [], "suppressed": []}
+        from app.services.dossier import migrate
+        migrate(profile)
+        from app.services.communication import migrate as migrate_memory
+        migrate_memory(profile)
         with self.connection() as db:
             self._write(db, profile)
         return profile
@@ -308,6 +318,8 @@ class ProfileStore:
     @staticmethod
     def _conflicts(p):
         for f in p["facts"]:
+            if f.get("use_in_ai") is False or f.get("memory_version") == 3:
+                continue  # Structured v2 conflicts are resolved by an explicit human correction.
             f["conflict"] = f["kind"] == "preference" and any(
                 g["kind"] == "preference" and normalize(g["topic"]) == normalize(f["topic"]) and g["polarity"] != f["polarity"]
                 for g in p["facts"])
@@ -324,11 +336,25 @@ class ProfileStore:
             if action == "delete":
                 p["facts"].remove(fact)
                 p["suppressed"].append(fact["key"])
+                from app.services.dossier import topic_key
+                p["suppressed_topics"].append(topic_key(self, fact["category"], fact["topic"], fact["context"]))
+                p["deleted_quotes"].extend(self.digest(normalize(e["quote"])) for e in fact["evidence"])
+                if fact.get("memory_version") == 3:
+                    p["memory_tombstones"].append({"memory_type":fact["memory_type"],"topic":fact["topic"],
+                                                  "subject":fact["subject"]})
+                for batch in p["batches"]:
+                    batch["changes"] = [c for c in batch.get("changes", []) if c["fact_id"] != fact_id]
             else:
                 if action == "correct":
                     if not text or not text.strip():
                         raise ValueError("修正内容不能为空")
+                    if fact.get("memory_version") == 3:
+                        from app.services.communication import snapshot
+                        fact["versions"].append({**snapshot(fact),"reason":"manual_correction","at":now()})
+                        fact.update(method="",example="",branches=[],interpretation="",source_level="user_note",
+                                    use_in_ai=False,validity="current",conflict=False)
                     fact["text"] = redact(text.strip())
+                    fact["manual_locked"] = True
                 fact["status"] = "corrected" if action == "correct" else "confirmed"
                 fact["reviewed_at"] = now()
             self._conflicts(p)
@@ -341,11 +367,35 @@ class ProfileStore:
 def public_profile(profile):
     """Internal deduplication identifiers never need to leave the backend."""
     copy = json.loads(json.dumps(profile))
+    from app.services.communication import cards_for, PROMPT_VERSION
+    copy["method_cards"] = json.loads(json.dumps(cards_for(profile)))
     copy.pop("suppressed", None)
+    copy.pop("suppressed_topics", None)
+    copy.pop("deleted_quotes", None)
+    copy.pop("memory_tombstones", None)
+    copy.pop("recognition_cache", None)
     for b in copy["batches"]:
         b.pop("fingerprint", None)
+        b.pop("message_keys", None)
     for f in copy["facts"]:
         f.pop("key", None)
+        f.pop("source_sessions", None)
+        for branch in f.get("branches", []):
+            branch.pop("evidence_keys", None)
+        for alternative in f.get("alternatives", []):
+            alternative.pop("evidence_keys", None)
+        for version in f.get("versions", []):
+            for branch in version.get("branches", []) or []:
+                branch.pop("evidence_keys", None)
         for e in f["evidence"]:
             e.pop("key", None)
+            e.pop("source_session", None)
+    for card in copy["method_cards"]:
+        for e in card["evidence"]:
+            e.pop("key",None)
+            e.pop("source_session",None)
+    from app.services.campus import board_for
+    copy["campus_board"] = board_for(copy)
+    copy["memory_summary"] = {"engine":PROMPT_VERSION, "records":sum(f.get("memory_version")==3 for f in copy["facts"]),
+                              "cards":len(copy["method_cards"]), "legacy_records":sum(f.get("memory_version")!=3 for f in copy["facts"])}
     return copy

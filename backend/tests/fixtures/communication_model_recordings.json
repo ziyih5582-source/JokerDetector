@@ -1,0 +1,584 @@
+{
+  "fictional": true,
+  "model": "deepseek-v4-pro",
+  "prompt_version": "communication-v3.1",
+  "note": "真实模型对虚构开发案例的已保存输出，用于离线回归，不是独立验收集或准确率报告。",
+  "records": [
+    {
+      "case_id": "C01",
+      "batch": {
+        "occurred_at": "2026-09-20",
+        "time_reliability": "confirmed",
+        "messages": [
+          {
+            "speaker": "self",
+            "text": "这次展示你负责第二部分可以吗？",
+            "message_id": "C01.B01.M01"
+          },
+          {
+            "speaker": "other",
+            "text": "可以。能不能以后分工把哪部分、几点前要一起说清楚？",
+            "message_id": "C01.B01.M02"
+          },
+          {
+            "speaker": "self",
+            "text": "行，这次第二部分，周五下午三点前。",
+            "message_id": "C01.B01.M03"
+          }
+        ],
+        "batch_id": "C01.B01",
+        "time_precision": "day",
+        "uploaded_at": "2026-09-20T20:00:00+08:00",
+        "as_of": "2026-09-20T20:00:00+08:00",
+        "role_reliability": "confirmed",
+        "source_kind": "chat",
+        "contact_ref": "C01:contact",
+        "other_display_name": "小林",
+        "sequence_reliability": "within_batch_ordered",
+        "context_hint": "任务合作"
+      },
+      "model_items": [
+        {
+          "memory_type": "communication_request",
+          "subject": "other",
+          "topic": "任务与截止时间",
+          "fact": "对方要求分工时明确负责部分和时间",
+          "scope": "任务分工",
+          "retention": "conditional",
+          "source_level": "direct",
+          "interpretation": "",
+          "method": "先说明负责部分和截止时间，再确认是否来得及",
+          "example": "这次需要第二部分，周五交，可以吗？",
+          "limitation": "不推广到所有日常聊天",
+          "target_id": null,
+          "operation": "add",
+          "event_identity": "",
+          "event_status": "unknown",
+          "evidence": [
+            {
+              "message_id": 1,
+              "quote": "能不能以后分工把哪部分、几点前要一起说清楚？"
+            }
+          ]
+        }
+      ],
+      "original_state_ids": [
+        "c09d6d25d96a495099c1c44ab54b2d45"
+      ]
+    },
+    {
+      "case_id": "C01",
+      "batch": {
+        "occurred_at": "2026-09-23",
+        "time_reliability": "confirmed",
+        "messages": [
+          {
+            "speaker": "self",
+            "text": "这次实验报告你负责图表好吗？",
+            "message_id": "C01.B02.M01"
+          },
+          {
+            "speaker": "other",
+            "text": "没问题，像上次那样写清我做哪些图、什么时候给你就行。",
+            "message_id": "C01.B02.M02"
+          },
+          {
+            "speaker": "self",
+            "text": "我把图表清单和时间一起发。",
+            "message_id": "C01.B02.M03"
+          }
+        ],
+        "batch_id": "C01.B02",
+        "time_precision": "day",
+        "uploaded_at": "2026-09-23T20:00:00+08:00",
+        "as_of": "2026-09-23T20:00:00+08:00",
+        "role_reliability": "confirmed",
+        "source_kind": "chat",
+        "contact_ref": "C01:contact",
+        "other_display_name": "小林",
+        "sequence_reliability": "within_batch_ordered",
+        "context_hint": "任务合作"
+      },
+      "model_items": [
+        {
+          "memory_type": "communication_request",
+          "subject": "other",
+          "topic": "任务与截止时间",
+          "fact": "对方要求分工时明确负责部分和时间",
+          "scope": "任务分工",
+          "retention": "conditional",
+          "source_level": "direct",
+          "interpretation": "",
+          "method": "先说明负责部分和截止时间，再确认是否来得及",
+          "example": "这次需要第二部分，周五交，可以吗？",
+          "limitation": "不推广到所有日常聊天",
+          "target_id": "c09d6d25d96a495099c1c44ab54b2d45",
+          "operation": "refine",
+          "event_identity": "",
+          "event_status": "unknown",
+          "evidence": [
+            {
+              "message_id": 1,
+              "quote": "没问题，像上次那样写清我做哪些图、什么时候给你就行。"
+            }
+          ]
+        }
+      ],
+      "original_state_ids": [
+        "c09d6d25d96a495099c1c44ab54b2d45"
+      ]
+    },
+    {
+      "case_id": "C01",
+      "batch": {
+        "occurred_at": "2026-09-28",
+        "time_reliability": "confirmed",
+        "messages": [
+          {
+            "speaker": "self",
+            "text": "快点交吧，不是说这周吗？",
+            "message_id": "C01.B03.M01"
+          },
+          {
+            "speaker": "other",
+            "text": "我以为这周是初稿。你现在要最终版？",
+            "message_id": "C01.B03.M02"
+          },
+          {
+            "speaker": "self",
+            "text": "是我没说清，周三初稿、周五最终版。",
+            "message_id": "C01.B03.M03"
+          },
+          {
+            "speaker": "other",
+            "text": "哦，那周三我先给你初稿。",
+            "message_id": "C01.B03.M04"
+          }
+        ],
+        "batch_id": "C01.B03",
+        "time_precision": "day",
+        "uploaded_at": "2026-09-28T20:00:00+08:00",
+        "as_of": "2026-09-28T20:00:00+08:00",
+        "role_reliability": "confirmed",
+        "source_kind": "chat",
+        "contact_ref": "C01:contact",
+        "other_display_name": "小林",
+        "sequence_reliability": "within_batch_ordered",
+        "context_hint": "任务合作"
+      },
+      "model_items": [
+        {
+          "memory_type": "shared_understanding",
+          "subject": "relation",
+          "topic": "截止时间误解与澄清",
+          "fact": "用户说“这周交”，对方理解为初稿，用户澄清为周三初稿、周五最终版，对方确认周三先交初稿",
+          "scope": "本次任务合作中关于截止时间的沟通",
+          "retention": "episode",
+          "source_level": "interaction",
+          "interpretation": "双方对“这周交”的具体交付物存在误解，经澄清后达成一致",
+          "method": "下次提到截止时间时，明确交付物和具体日期，避免模糊表述",
+          "example": "周三交初稿，周五交最终版",
+          "limitation": "不推广到其他任务或日常沟通",
+          "target_id": null,
+          "operation": "add",
+          "event_identity": "",
+          "event_status": "unknown",
+          "evidence": [
+            {
+              "message_id": 0,
+              "quote": "快点交吧，不是说这周吗？"
+            },
+            {
+              "message_id": 1,
+              "quote": "我以为这周是初稿。你现在要最终版？"
+            },
+            {
+              "message_id": 2,
+              "quote": "是我没说清，周三初稿、周五最终版。"
+            },
+            {
+              "message_id": 3,
+              "quote": "哦，那周三我先给你初稿。"
+            }
+          ]
+        }
+      ],
+      "original_state_ids": [
+        "c09d6d25d96a495099c1c44ab54b2d45",
+        "3a78fdec1f7742489eae07e96b852aae"
+      ]
+    },
+    {
+      "case_id": "C02",
+      "batch": {
+        "occurred_at": "2026-09-20",
+        "time_reliability": "confirmed",
+        "messages": [
+          {
+            "speaker": "self",
+            "text": "我把你上次口误发群里逗大家一下？",
+            "message_id": "C02.B01.M01"
+          },
+          {
+            "speaker": "other",
+            "text": "别在群里拿我开玩笑。",
+            "message_id": "C02.B01.M02"
+          },
+          {
+            "speaker": "self",
+            "text": "好，不发。",
+            "message_id": "C02.B01.M03"
+          }
+        ],
+        "batch_id": "C02.B01",
+        "time_precision": "day",
+        "uploaded_at": "2026-09-20T20:00:00+08:00",
+        "as_of": "2026-09-20T20:00:00+08:00",
+        "role_reliability": "confirmed",
+        "source_kind": "chat",
+        "contact_ref": "C02:contact",
+        "other_display_name": "小林",
+        "sequence_reliability": "within_batch_ordered",
+        "context_hint": "朋友聊天与群内表达"
+      },
+      "model_items": [
+        {
+          "memory_type": "boundary",
+          "subject": "other",
+          "topic": "不在群里开玩笑",
+          "fact": "对方明确表示不要在群里拿他开玩笑",
+          "scope": "群聊中涉及对方的内容",
+          "retention": "conditional",
+          "source_level": "direct",
+          "interpretation": "",
+          "method": "在群里发布涉及对方的内容前，先确认对方是否同意",
+          "example": "我准备发这个，你介意吗？",
+          "limitation": "不推广到私下聊天",
+          "target_id": null,
+          "operation": "add",
+          "event_identity": "",
+          "event_status": "unknown",
+          "evidence": [
+            {
+              "message_id": 1,
+              "quote": "别在群里拿我开玩笑。"
+            }
+          ]
+        }
+      ],
+      "original_state_ids": [
+        "8f7535d4682f47d7b134c67366f47d49"
+      ]
+    },
+    {
+      "case_id": "C02",
+      "batch": {
+        "occurred_at": "2026-09-22",
+        "time_reliability": "confirmed",
+        "messages": [
+          {
+            "speaker": "self",
+            "text": "那以后分工也不在群里提你吗？",
+            "message_id": "C02.B02.M01"
+          },
+          {
+            "speaker": "other",
+            "text": "群里说任务没关系，我是不喜欢被拿来开玩笑。",
+            "message_id": "C02.B02.M02"
+          }
+        ],
+        "batch_id": "C02.B02",
+        "time_precision": "day",
+        "uploaded_at": "2026-09-22T20:00:00+08:00",
+        "as_of": "2026-09-22T20:00:00+08:00",
+        "role_reliability": "confirmed",
+        "source_kind": "chat",
+        "contact_ref": "C02:contact",
+        "other_display_name": "小林",
+        "sequence_reliability": "within_batch_ordered",
+        "context_hint": "朋友聊天与群内表达"
+      },
+      "model_items": [
+        {
+          "memory_type": "boundary",
+          "subject": "other",
+          "topic": "不在群里开玩笑",
+          "fact": "对方不喜欢在群里被拿来开玩笑，但群里说任务没关系",
+          "scope": "群聊中涉及对方的内容",
+          "retention": "conditional",
+          "source_level": "direct",
+          "interpretation": "",
+          "method": "在群里可以正常讨论任务，但避免拿对方开玩笑",
+          "example": "群里说任务没关系，但不要拿他开玩笑",
+          "limitation": "不推广到私下聊天或其他场合",
+          "target_id": "8f7535d4682f47d7b134c67366f47d49",
+          "operation": "refine",
+          "event_identity": "",
+          "event_status": "unknown",
+          "evidence": [
+            {
+              "message_id": 1,
+              "quote": "群里说任务没关系，我是不喜欢被拿来开玩笑。"
+            }
+          ]
+        }
+      ],
+      "original_state_ids": [
+        "8f7535d4682f47d7b134c67366f47d49"
+      ]
+    },
+    {
+      "case_id": "C02",
+      "batch": {
+        "occurred_at": "2026-09-24",
+        "time_reliability": "confirmed",
+        "messages": [
+          {
+            "speaker": "self",
+            "text": "我在私聊接一下你刚才的自嘲可以吗？",
+            "message_id": "C02.B03.M01"
+          },
+          {
+            "speaker": "other",
+            "text": "我自己先开这种玩笑时，你私下接一下没事。",
+            "message_id": "C02.B03.M02"
+          },
+          {
+            "speaker": "self",
+            "text": "知道了，不放群里。",
+            "message_id": "C02.B03.M03"
+          }
+        ],
+        "batch_id": "C02.B03",
+        "time_precision": "day",
+        "uploaded_at": "2026-09-24T20:00:00+08:00",
+        "as_of": "2026-09-24T20:00:00+08:00",
+        "role_reliability": "confirmed",
+        "source_kind": "chat",
+        "contact_ref": "C02:contact",
+        "other_display_name": "小林",
+        "sequence_reliability": "within_batch_ordered",
+        "context_hint": "朋友聊天与群内表达"
+      },
+      "model_items": [
+        {
+          "memory_type": "boundary",
+          "subject": "other",
+          "topic": "私聊接自嘲的边界",
+          "fact": "对方允许在私聊中接他自己先开的自嘲玩笑，但要求不放群里",
+          "scope": "私聊中对方先自嘲时",
+          "retention": "conditional",
+          "source_level": "direct",
+          "interpretation": "",
+          "method": "对方先自嘲时，可以在私聊接话，但不要转发到群里",
+          "example": "你刚才自嘲那个，我私聊接一下可以吗？",
+          "limitation": "不适用于对方未自嘲或群聊场景",
+          "target_id": "8f7535d4682f47d7b134c67366f47d49",
+          "operation": "refine",
+          "event_identity": "",
+          "event_status": "unknown",
+          "evidence": [
+            {
+              "message_id": 0,
+              "quote": "我在私聊接一下你刚才的自嘲可以吗？"
+            },
+            {
+              "message_id": 1,
+              "quote": "我自己先开这种玩笑时，你私下接一下没事。"
+            },
+            {
+              "message_id": 2,
+              "quote": "知道了，不放群里。"
+            }
+          ]
+        }
+      ],
+      "original_state_ids": [
+        "8f7535d4682f47d7b134c67366f47d49"
+      ]
+    },
+    {
+      "case_id": "C05",
+      "batch": {
+        "occurred_at": "2026-09-20",
+        "time_reliability": "confirmed",
+        "messages": [
+          {
+            "speaker": "self",
+            "text": "A公司的面试定了？",
+            "message_id": "C05.B01.M01"
+          },
+          {
+            "speaker": "other",
+            "text": "今年10月12号，A公司第一轮。",
+            "message_id": "C05.B01.M02"
+          }
+        ],
+        "batch_id": "C05.B01",
+        "time_precision": "day",
+        "uploaded_at": "2026-09-20T20:00:00+08:00",
+        "as_of": "2026-09-20T20:00:00+08:00",
+        "role_reliability": "confirmed",
+        "source_kind": "chat",
+        "contact_ref": "C05:contact",
+        "other_display_name": "小林",
+        "sequence_reliability": "within_batch_ordered",
+        "context_hint": "求职安排"
+      },
+      "model_items": [
+        {
+          "memory_type": "event",
+          "subject": "relation",
+          "topic": "A公司面试安排",
+          "fact": "A公司第一轮面试定于今年10月12号",
+          "scope": "A公司求职流程",
+          "retention": "episode",
+          "source_level": "interaction",
+          "interpretation": "",
+          "method": "",
+          "example": "",
+          "limitation": "不推广到其他公司或后续轮次",
+          "target_id": null,
+          "operation": "add",
+          "event_identity": "A公司第一轮面试",
+          "event_status": "unknown",
+          "evidence": [
+            {
+              "message_id": 0,
+              "quote": "A公司的面试定了？"
+            },
+            {
+              "message_id": 1,
+              "quote": "今年10月12号，A公司第一轮。"
+            }
+          ]
+        }
+      ],
+      "original_state_ids": [
+        "83e2919c7f0d409ba5c426f10cac50cd"
+      ]
+    },
+    {
+      "case_id": "C05",
+      "batch": {
+        "occurred_at": "2026-09-25",
+        "time_reliability": "confirmed",
+        "messages": [
+          {
+            "speaker": "other",
+            "text": "A公司把第一轮改到今年10月15号了。",
+            "message_id": "C05.B02.M01"
+          },
+          {
+            "speaker": "self",
+            "text": "知道了，原来的12号不用去了。",
+            "message_id": "C05.B02.M02"
+          }
+        ],
+        "batch_id": "C05.B02",
+        "time_precision": "day",
+        "uploaded_at": "2026-09-25T20:00:00+08:00",
+        "as_of": "2026-09-25T20:00:00+08:00",
+        "role_reliability": "confirmed",
+        "source_kind": "chat",
+        "contact_ref": "C05:contact",
+        "other_display_name": "小林",
+        "sequence_reliability": "within_batch_ordered",
+        "context_hint": "求职安排"
+      },
+      "model_items": [
+        {
+          "memory_type": "event",
+          "subject": "relation",
+          "topic": "A公司面试安排",
+          "fact": "A公司第一轮面试从10月12号改到10月15号",
+          "scope": "A公司求职流程",
+          "retention": "episode",
+          "source_level": "interaction",
+          "interpretation": "",
+          "method": "",
+          "example": "",
+          "limitation": "不推广到其他公司或轮次",
+          "target_id": "83e2919c7f0d409ba5c426f10cac50cd",
+          "operation": "change",
+          "event_identity": "A公司第一轮面试",
+          "event_status": "unknown",
+          "evidence": [
+            {
+              "message_id": 0,
+              "quote": "A公司把第一轮改到今年10月15号了。"
+            },
+            {
+              "message_id": 1,
+              "quote": "知道了，原来的12号不用去了。"
+            }
+          ]
+        }
+      ],
+      "original_state_ids": [
+        "83e2919c7f0d409ba5c426f10cac50cd"
+      ]
+    },
+    {
+      "case_id": "C05",
+      "batch": {
+        "occurred_at": "2026-09-19",
+        "time_reliability": "confirmed",
+        "messages": [
+          {
+            "speaker": "self",
+            "text": "A公司第一轮是什么时候？",
+            "message_id": "C05.B03.M01"
+          },
+          {
+            "speaker": "other",
+            "text": "定在今年10月12号。",
+            "message_id": "C05.B03.M02"
+          }
+        ],
+        "uploaded_at": "2026-10-01T20:00:00+08:00",
+        "batch_id": "C05.B03",
+        "time_precision": "day",
+        "as_of": "2026-10-01T20:00:00+08:00",
+        "role_reliability": "confirmed",
+        "source_kind": "chat",
+        "contact_ref": "C05:contact",
+        "other_display_name": "小林",
+        "sequence_reliability": "within_batch_ordered",
+        "context_hint": "求职安排"
+      },
+      "model_items": [
+        {
+          "memory_type": "event",
+          "subject": "relation",
+          "topic": "A公司面试安排",
+          "fact": "A公司第一轮面试定在10月12号",
+          "scope": "A公司求职流程",
+          "retention": "episode",
+          "source_level": "interaction",
+          "interpretation": "",
+          "method": "",
+          "example": "",
+          "limitation": "不推广到其他公司或轮次",
+          "target_id": "83e2919c7f0d409ba5c426f10cac50cd",
+          "operation": "conflict",
+          "event_identity": "A公司第一轮面试",
+          "event_status": "unknown",
+          "evidence": [
+            {
+              "message_id": 0,
+              "quote": "A公司第一轮是什么时候？"
+            },
+            {
+              "message_id": 1,
+              "quote": "定在今年10月12号。"
+            }
+          ]
+        }
+      ],
+      "original_state_ids": [
+        "83e2919c7f0d409ba5c426f10cac50cd"
+      ]
+    }
+  ]
+}

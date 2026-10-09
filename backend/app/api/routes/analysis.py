@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 import tempfile
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from starlette.concurrency import run_in_threadpool
@@ -51,6 +51,9 @@ def unified_analyze(body: UnifiedInput):
         use_ai=body.use_ai,
         include_guidance=body.include_guidance,
         source="本次聊天片段",
+        profile_engine=body.profile_engine,
+        chat_date=body.chat_date.isoformat() if body.chat_date else None,
+        scene=body.scene,
     )
 
 
@@ -61,6 +64,7 @@ def analyze_demo(
     contact_id: Optional[str] = Query(None, description="同时更新该联系人档案；不传则只分析"),
     save_consent: bool = Query(False),
     include_guidance: bool = Query(False),
+    profile_engine: Literal["communication", "legacy"] = Query("legacy"),
 ):
     """使用内置 Demo 数据走统一流程，返回结构与 /api/analyze/unified 一致。
 
@@ -81,6 +85,7 @@ def analyze_demo(
         use_ai=cloud_consent,
         include_guidance=bool(include_guidance or cloud_consent),
         source=demo["title"],
+        profile_engine=profile_engine,
     )
 
 

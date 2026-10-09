@@ -20,7 +20,9 @@ class ChatInput(StrictModel):
     messages: list[Turn] = Field(min_length=1, max_length=config.CHAT_TURNS)
     contact_id: str | None = Field(default=None, max_length=64)
     use_profile: bool = False
+    context_token: str | None = Field(default=None,max_length=20000)
 
 
 class ContextInput(StrictModel):
     contact_id: str = Field(min_length=1, max_length=64)
+    query: str = Field(default="",max_length=MAX_CHARS_PER_TURN)

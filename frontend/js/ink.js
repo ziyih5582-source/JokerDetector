@@ -33,8 +33,8 @@
   };
 
   var SAMPLES = [
-    '我：周末有什么安排？\n小林：我喜欢徒步\n我：想喝点什么？\n小林：我喜欢咖啡\n我：好的，周末见！\n小林：我的电话是13812345678',
-    '我：最近口味有没有变化？\n小林：我现在不喜欢咖啡\n我：那我们换个活动吧\n小林：我喜欢看电影\n我：徒步还去吗？\n小林：我喜欢徒步'
+    '我：这次展示你负责第二部分可以吗？\n小林：能不能以后分工把哪部分、几点前要一起说清楚？\n我：我把口误截图发群里逗大家？\n小林：别在群里拿我开玩笑。',
+    '我：快点交吧，不是说这周吗？\n小林：我以为这周是初稿，你现在要最终版？\n我：是我没说清，周三初稿、周五最终版。\n小林：哦，那周三我先给你初稿。'
   ];
 
   var LEVEL_NAME = {
@@ -255,7 +255,7 @@
       button.setAttribute('aria-pressed', String(!!(state.profile && state.profile.id === c.id)));
       button.append(el('span', 'dot'));
       button.append(el('b', '', c.name));
-      button.append(el('small', '', c.fact_count + ' 条 · ' + c.batch_count + ' 次分析'));
+      button.append(el('small', '', c.batch_count + ' 段聊天'));
       button.addEventListener('click', function () {
         guard(function () { return selectContact(c.id); });
       });
@@ -328,13 +328,25 @@
     var p = state.profile;
     $('no-contact').hidden = !!p;
     $('contact-workspace').hidden = !p;
+    if (window.ProfileEditor) window.ProfileEditor.render(p, {
+      onCreated: async function (created) {
+        await refreshContacts();
+        await selectContact(created.id);
+      },
+      onUpdate: async function (updated) {
+        if (!state.profile || state.profile.id !== updated.id) return;
+        state.profile = updated;
+        renderProfile();
+        await refreshContacts();
+      }
+    });
     if (!p) return;
 
     $('profile-name').textContent = p.name;
-    $('profile-meta').textContent = '建立于 ' + date(p.created_at) + ' · 同名不会自动合并，需要你自己分辨';
-    $('fact-count').textContent = p.facts.length;
+    $('profile-meta').textContent = (p.relationship_tags || []).join(' · ') + ' · 已整理 ' + p.batches.length + ' 段聊天';
+    $('fact-count').textContent = p.memory_summary ? p.memory_summary.records : p.facts.length;
     $('review-count').textContent = p.facts.filter(function (f) {
-      return f.status === 'unreviewed' || f.conflict;
+      return f.memory_version === 3 ? f.retention === 'pending' || f.conflict : f.status === 'unreviewed' || f.conflict;
     }).length;
     $('batch-count').textContent = p.batches.length;
     $('revision').textContent = p.revision;
@@ -467,6 +479,7 @@
       save_consent: $('save-consent').checked,
       use_ai: $('use-ai').checked,
       include_guidance: $('include-guidance').checked
+      ,profile_engine: 'communication', chat_date: $('flow-chat-date').value || null
     };
   }
 
@@ -855,6 +868,7 @@
     }
     var before = await snapshotFacts(contactId);
     var query = [
+      'profile_engine=communication',
       'cloud_consent=' + ($('use-ai').checked ? 'true' : 'false'),
       'include_guidance=' + ($('include-guidance').checked ? 'true' : 'false')
     ];
@@ -1136,7 +1150,7 @@
       });
       body.append(list);
     } else if (!profile.facts.length) {
-      body.append(el('p', 'note', '这段聊天里没有认出明确的喜好。档案留白也是一种记录。'));
+      body.append(el('p', 'note', '本段没有提炼出可用的沟通信息。没有依据时，档案保持留白。'));
     }
 
     var actions = el('div', 'line-actions');
@@ -2044,11 +2058,12 @@ bindMetricTooltip(label, metricKey, metric);
   }
 
   function initBook() {
+    renderProfile();
     $('contact-search').addEventListener('input', renderContacts);
     $('export-contact').addEventListener('click', function () {
       if (!state.profile) return;
       var data = Object.assign({}, state.profile, {
-        export_note: '含脱敏依据的个人档案，请妥善保管。时间为导入时间，推测不代表完整人格。'
+        export_note: '含脱敏依据的个人档案，请妥善保管。at 为上传时间，chat_date / observed_on 为用户确认的聊天日期；缺失日期不推测。'
       });
       var url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' }));
       var link = el('a');
@@ -2525,13 +2540,24 @@ bindMetricTooltip(label, metricKey, metric);
       return { role: message.role, content: message.content };
     });
     try {
+      var contextToken = null, contactId = chat.contactId || null, useProfile = !!chat.useProfile;
+      if (useProfile && contactId) {
+        var contextPreview = await api('/api/fisherman/context', {
+          method: 'POST', body: JSON.stringify({ contact_id: contactId, query: history[history.length - 1].content })
+        });
+        contextToken = contextPreview.token;
+        $('fisher-context').textContent = contextPreview.text;
+        $('fisher-context-box').hidden = false;
+        $('fisher-context-count').textContent = '· ' + contextPreview.fact_count + ' 条相关记录';
+      }
       var response = await fetch('/api/fisherman/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: history,
-          contact_id: chat.contactId || null,
-          use_profile: !!chat.useProfile
+          contact_id: contactId,
+          use_profile: useProfile,
+          context_token: contextToken
         })
       });
       if (!response.ok) {
@@ -2633,7 +2659,16 @@ bindMetricTooltip(label, metricKey, metric);
     $('use-ai').checked = false;
     syncOptions();
     setHere(document.body.dataset.view);
-    guard(refreshContacts);
+    guard(async function () {
+      await refreshContacts();
+      var params = new URLSearchParams(window.location.search);
+      if (params.has('preview') || window.location.pathname === '/profiles') {
+        go('book');
+        var contact = params.get('contact');
+        if (contact && state.contacts.some(function (c) { return c.id === contact; })) await selectContact(contact);
+        else if (state.contacts.length) await selectContact(state.contacts[0].id);
+      }
+    });
     health();
     loadDemos();
     window.addEventListener('focus', function () { health(); });

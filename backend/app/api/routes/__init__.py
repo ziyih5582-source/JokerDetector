@@ -3,12 +3,13 @@
 
 from fastapi import APIRouter
 
-from app.api.routes import analysis, fisherman, profiles, system
+from app.api.routes import analysis, fisherman, profiles, system, campus_preview
 
 api_router = APIRouter()
 api_router.include_router(system.router)
 api_router.include_router(analysis.router)
 api_router.include_router(profiles.router)
 api_router.include_router(fisherman.router)
+api_router.include_router(campus_preview.router)
 
 __all__ = ["api_router"]

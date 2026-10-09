@@ -25,6 +25,7 @@ def body(**overrides):
                      {"speaker": "我", "content": "好呀"}],
         "self_speaker": "我",
         "other_speaker": "小林",
+        "profile_engine": "legacy",  # Preserve explicit v1 API compatibility checks.
     }
     data.update(overrides)
     return data

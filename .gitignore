@@ -247,3 +247,12 @@ __marimo__/
 
 # macOS
 .DS_Store
+
+# Private archive storage and local installers/backups
+.dossier-backups/
+.archive-backups/
+JokerDetector-update/
+data/preview/
+*.sqlite3
+*.sqlite3-*
+profile.key

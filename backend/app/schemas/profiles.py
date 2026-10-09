@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from typing import Literal
+from datetime import date
 
 from pydantic import Field
 
@@ -28,6 +29,9 @@ class AnalyzeInput(StrictModel):
     save_consent: bool = False
     use_ai: bool = False
     include_guidance: bool = False
+    profile_engine: Literal["communication", "legacy"] = "legacy"
+    chat_date: date | None = None
+    scene: str = Field(default="",max_length=100)
 
 
 class FactEdit(StrictModel):
@@ -46,6 +50,9 @@ class UnifiedInput(StrictModel):
     save_consent: bool = False
     use_ai: bool = False
     include_guidance: bool = False
+    profile_engine: Literal["communication", "legacy"] = "communication"
+    chat_date: date | None = None
+    scene: str = Field(default="",max_length=100)
 
 
 class JokerDetectInput(StrictModel):
