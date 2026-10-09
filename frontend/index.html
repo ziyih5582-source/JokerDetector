@@ -7,8 +7,8 @@
 <meta name="description" content="交心 · 思源湖研究所：把一段聊天交给思源湖，算法量投入，AI 读语气，湖畔的钓翁陪你把它想明白。上海交通大学工程学导论课程项目。">
 <meta name="theme-color" content="#f4f0e6">
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-<link rel="stylesheet" href="/static/css/ink.css">
-<link rel="stylesheet" href="/static/css/dossier.css">
+<link rel="stylesheet" href="/static/css/ink.css?v=archive-focus-6.2">
+<link rel="stylesheet" href="/static/css/dossier.css?v=archive-focus-6.2">
 </head>
 <body data-view="pond">
 
@@ -413,8 +413,8 @@
     <section class="view" data-view="book">
       <div class="lede">
         <span class="eyebrow">人物档案</span>
-        <h2>慢慢了解，一个具体的人</h2>
-        <p>记住聊得来的理由、相处的分寸，还有你们一路发生的变化。</p>
+        <h2>人物档案</h2>
+        <p>对这个人的了解，随着聊天慢慢完善。</p>
       </div>
 
 
@@ -439,9 +439,19 @@
           </div>
 
           <div id="contact-workspace" hidden>
-            <div class="roster-head">
-              <h3 id="profile-name"></h3>
-              <p class="note" id="profile-meta"></p>
+            <div class="archive-person-head">
+              <div class="roster-head"><h3 id="profile-name"></h3><p class="note" id="profile-meta"></p></div>
+              <div class="archive-person-actions">
+                <button type="button" class="line-btn" id="campus-add-chat">＋ 上传聊天</button>
+                <details class="campus-manage"><summary>管理</summary><div class="archive-management-menu">
+                  <button type="button" id="archive-view-records" class="line-btn quiet">全部记录与历史</button>
+                  <button type="button" id="archive-add-note" class="line-btn quiet">补充一条认识</button>
+                  <button type="button" id="archive-edit-person" class="line-btn quiet">修改称呼与备注</button>
+                  <button type="button" id="goto-flow" class="line-btn quiet">去谈心分析</button>
+                  <button type="button" id="export-contact" class="line-btn quiet">导出档案</button>
+                  <button type="button" id="delete-contact" class="line-btn danger">删除此人</button>
+                </div></details>
+              </div>
             </div>
             <div class="tally">
               <div><b id="fact-count">0</b><span>沟通记录</span></div>
@@ -449,23 +459,17 @@
               <div><b id="batch-count">0</b><span>次更新</span></div>
               <div hidden><b id="revision">0</b><span>版本</span></div>
             </div>
-            <details class="campus-manage"><summary>档案管理</summary><div class="line-actions">
-              <button type="button" id="goto-flow" class="line-btn quiet">去谈心分析</button>
-              <button type="button" id="export-contact" class="line-btn quiet">导出为 JSON</button>
-              <button type="button" id="delete-contact" class="line-btn danger">删除此人</button>
-            </div></details>
-
             <div id="profile-editor">
-              <div class="campus-toolbar"><p class="campus-caption">从这一页，继续了解 TA</p><button type="button" class="line-btn" id="campus-add-chat">＋ 添一段聊天</button></div>
               <div id="campus-reviews" hidden></div>
               <p id="dossier-status" class="note" role="status" aria-live="polite"></p>
-              <h3 class="block-title" id="campus-method-heading"><span>处</span>下次相处时，可以记得</h3>
+              <div id="campus-sections" class="archive-portrait"></div>
+              <div id="campus-overview"></div>
+              <h3 class="block-title" id="campus-method-heading">相处建议</h3>
               <div id="memory-cards" class="memory-cards"></div>
               <div id="memory-context"></div>
-              <div id="campus-overview"></div>
-              <div id="campus-sections"></div>
 
-
+              <dialog id="archive-upload-dialog" class="archive-dialog" aria-labelledby="archive-upload-title">
+              <div class="archive-dialog-head"><h3 id="archive-upload-title">上传聊天</h3><button type="button" class="line-btn quiet" data-close-archive="archive-upload-dialog">关闭</button></div>
               <details class="dossier-panel" id="dossier-import-panel">
                 <summary>上传新聊天，让档案继续完善</summary>
                 <label>聊天原文<textarea id="dossier-chat" rows="6" maxlength="130000" placeholder="每行“发言者：内容”。也可导入 Excel 或聊天截图，先校对再识别。"></textarea></label>
@@ -475,10 +479,11 @@
                 </div>
                 <details id="memory-input-details">
                   <summary id="memory-speakers">核对发言者与聊天日期</summary>
+                  <p id="archive-ocr-dates" class="note" hidden></p>
                   <div class="dossier-grid">
                     <label>我的发言者名称<input id="dossier-self" value="我" maxlength="100"></label>
                     <label>对方的发言者名称<input id="dossier-other" maxlength="100"></label>
-                    <label>真实聊天日期（不确定就留空）<input id="dossier-chat-date" type="date"></label>
+                    <label>统一聊天日期（跨天请留空）<input id="dossier-chat-date" type="date"></label>
                     <label>可选的一句背景<input id="dossier-scene" maxlength="100" placeholder="例如：小组分工"></label>
                   </div>
                 </details>
@@ -489,9 +494,17 @@
                 <pre id="dossier-redacted" class="dossier-redacted" hidden></pre>
                 <div id="memory-update"></div>
               </details>
+              </dialog>
 
-              <details id="campus-tools" class="dossier-panel"><summary>依据、变化与管理</summary>
-              <details class="dossier-panel" id="campus-timeline-panel"><summary>随着聊天，我们的了解有什么变化</summary><div id="campus-timeline"></div></details>
+              <dialog id="archive-tools-dialog" class="archive-dialog" aria-labelledby="archive-tools-title">
+              <div class="archive-dialog-head"><h3 id="archive-tools-title">全部记录与历史</h3><button type="button" class="line-btn quiet" data-close-archive="archive-tools-dialog">关闭</button></div>
+              <div id="campus-tools">
+              <section id="archive-records-pane">
+                <div id="memory-basis"><div id="dossier-groups"></div></div>
+                <details class="dossier-panel" id="campus-timeline-panel"><summary>认识发生过的变化</summary><div id="campus-timeline"></div></details>
+                <details class="dossier-panel"><summary>以往的单次分析</summary><div id="history" class="history"></div></details>
+              </section>
+              <section id="archive-notes-pane" hidden>
               <details class="dossier-panel" id="memory-note-panel">
                 <summary>用一句话补充或修正我的认识</summary>
                 <form id="memory-note-form">
@@ -501,9 +514,8 @@
                   <div class="line-actions"><button class="line-btn" type="submit">保存这句话</button><button class="line-btn quiet" id="memory-note-reset" type="button">清空</button></div>
                 </form>
               </details>
-
-              <details class="dossier-panel">
-                <summary>可选的关系标签与背景</summary>
+              </section>
+              <section id="archive-person-pane" hidden>
                 <form id="dossier-contact-form">
                   <div class="dossier-grid">
                     <label>称呼<input id="dossier-name" required maxlength="60"></label>
@@ -512,15 +524,13 @@
                   <label>仅本地的关系备注<textarea id="dossier-background" rows="2" maxlength="500"></textarea></label>
                   <button class="line-btn quiet" type="submit">保存可选资料</button>
                 </form>
-              </details>
-
-              <details class="dossier-panel" id="memory-basis"><summary>查看记录、依据与历史</summary><div id="dossier-groups"></div></details>
-              </details>
+              </section>
+              </div>
+              </dialog>
             </div>
 
             <div id="facts" class="facts" hidden></div>
 
-            <details class="dossier-panel"><summary>以往的单次分析</summary><div id="history" class="history"></div></details>
           </div>
         </div>
       </div>
@@ -821,7 +831,7 @@
 <script src="/static/js/pond.js"></script>
 <script src="/static/js/clown.js"></script>
 <script src="/static/js/speech.js"></script>
-<script src="/static/js/dossier.js"></script>
-<script src="/static/js/ink.js"></script>
+<script src="/static/js/dossier.js?v=archive-focus-6.2"></script>
+<script src="/static/js/ink.js?v=archive-focus-6.2"></script>
 </body>
 </html>

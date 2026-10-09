@@ -5,6 +5,7 @@ from pydantic import Field
 
 from app.schemas.base import StrictModel
 from app.schemas.dossier import DossierImport
+from app.schemas.profiles import Message
 
 MemoryType = Literal["communication_request", "boundary", "support_need", "situated_trait",
                      "shared_understanding", "stage_context", "event", "useful_preference",
@@ -40,7 +41,14 @@ class Candidate(StrictModel):
     evidence: list[Evidence] = Field(min_length=1, max_length=6)
 
 
+class ArchiveMessage(Message):
+    time: str | None = Field(default=None, max_length=100)
+    time_guessed: bool = False
+    kind: str = Field(default="text", max_length=32)
+
+
 class MemoryImport(DossierImport):
+    messages: list[ArchiveMessage] = Field(min_length=2, max_length=1000)
     save_consent: bool = False
     role_reliability: Literal["confirmed", "unverified"] = "confirmed"
     time_reliability: Literal["confirmed", "unknown", "ocr_uncertain"] = "confirmed"

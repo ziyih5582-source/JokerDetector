@@ -74,3 +74,52 @@ body[data-view="book"] #pond-canvas { opacity:.12; }
 .memory-method { padding:1rem; background:#f2f3eb; border:1px solid #dce0d2; border-radius:4px; }
 .memory-method .memory-action { font-size:.9rem; }
 @media(max-width:900px) { .campus-grid,#profile-editor .memory-cards { grid-template-columns:1fr; } }
+
+/* Focused archive: visible knowledge first, occasional actions in one dialog. */
+body[data-view="book"] { background:#f8f8f5; }
+body[data-view="book"] .view[data-view="book"] { font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif; }
+body[data-view="book"] #pond-canvas,body[data-view="book"] .lake,body[data-view="book"] .veil { display:none; }
+body[data-view="book"] .lede { margin:16px 0 24px; padding:0; }
+body[data-view="book"] .lede .eyebrow,body[data-view="book"] .lede p { display:none; }
+body[data-view="book"] .lede h2 { font-size:1.4rem; letter-spacing:0; margin:0; }
+body[data-view="book"] .grid-roster { grid-template-columns:200px minmax(0,1fr); gap:32px; }
+body[data-view="book"] .col-side > .note { display:none; }
+.archive-person-head { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding-bottom:18px; border-bottom:1px solid #dedfd7; margin-bottom:20px; }
+.archive-person-head .roster-head { margin:0; border:0; padding:0; }
+.archive-person-head .roster-head h3 { margin:0; font-size:1.4rem; }
+.archive-person-head #profile-meta { margin:.2rem 0 0; font-size:.78rem; }
+.archive-person-actions { display:flex; align-items:center; gap:16px; }
+.archive-person-actions > .line-btn { padding:.5rem .9rem; border:1px solid #c4cfc1; background:#edf2e9; border-radius:6px; font-size:.85rem; }
+.campus-manage { position:relative; }
+.archive-management-menu { position:absolute; right:0; top:100%; z-index:20; min-width:180px; padding:.5rem; background:#fffdf8; border:1px solid #ded8ce; border-radius:8px; box-shadow:0 12px 35px #26251d18; }
+.archive-management-menu button { display:block; width:100%; text-align:left; padding:.5rem .7rem; margin:0; }
+.campus-manage > summary { padding:.5rem; }
+#dossier-status:empty,.archive-dialog-status:empty { display:none; }
+.archive-portrait { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.archive-portrait .campus-section { margin:0; padding:18px 20px; border:1px solid #e0e2da; border-radius:10px; background:#fff; }
+.archive-portrait .campus-section:first-child { grid-column:1/-1; }
+.archive-portrait .campus-section:first-child .campus-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; }
+.archive-portrait .campus-section h3 { margin:0 0 8px; font-size:.82rem; color:#6a7564; font-weight:500; }
+.archive-portrait .campus-memory { padding:10px 0 4px; border:0; }
+.archive-portrait .campus-memory h4 { font-size:1rem; margin:0 0 5px; }
+.archive-portrait .campus-memory > p { font-size:.88rem; line-height:1.7; margin:0; }
+.archive-portrait .campus-memory details { margin-top:7px; }
+#campus-overview { margin:16px 0; }
+#campus-overview .campus-relationship { padding:0; }
+#campus-overview .campus-relationship > h3,#campus-overview .campus-relationship > .note { display:none; }
+#campus-method-heading { font-size:.95rem; padding-top:12px; margin:12px 0; letter-spacing:0; }
+#profile-editor .memory-cards { grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; }
+#profile-editor .memory-method { background:#f0f3ed; padding:16px 18px; border:0; border-radius:8px; }
+#profile-editor .memory-method h4 { font-size:.9rem; margin:0 0 6px; }
+#profile-editor .memory-action { font-weight:400; font-size:.85rem; line-height:1.7; }
+.archive-dialog { width:min(760px,calc(100vw - 48px)); max-height:85vh; padding:24px; border:1px solid #d7dad1; border-radius:12px; background:#fffdf9; color:var(--ink); overflow:auto; }
+.archive-dialog::backdrop { background:#20271b66; }
+.archive-dialog-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+.archive-dialog-head h3 { margin:0; font-size:1.15rem; }
+.archive-dialog #dossier-import-panel,.archive-dialog #memory-note-panel { border:0; padding:0; margin:0; }
+.archive-dialog #dossier-import-panel > summary,.archive-dialog #memory-note-panel > summary { display:none; }
+.archive-dialog .fact { border-bottom:1px solid #e2e3dc; padding:12px 0; }
+.archive-dialog .fact h4 { font-size:.95rem; }
+.archive-dialog .line-btn { font-size:.83rem; }
+.archive-dialog .error { color:#a43e35; }
+@media(max-width:900px) { body[data-view="book"] .grid-roster { grid-template-columns:1fr; } .archive-person-head { flex-wrap:wrap; } .archive-portrait,.archive-portrait .campus-section:first-child .campus-grid { grid-template-columns:1fr; } .archive-dialog { width:calc(100vw - 24px); padding:18px; } }

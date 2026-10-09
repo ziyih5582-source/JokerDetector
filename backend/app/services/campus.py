@@ -7,6 +7,11 @@ import re
 
 from app.services.communication import today
 
+
+def topic_grams(text):
+    text = re.sub(r"\s+", "", text)
+    return {text[i:i+2] for i in range(len(text)-1)} - {"喜欢", "喜好", "习惯", "兴趣", "偏好", "沟通"}
+
 CONTEXT_TYPES = {"emotional_state", "stage_context", "event"}
 
 
@@ -60,9 +65,41 @@ def board_for(public):
     sections = [{"title": "对 TA 的了解", "items": knowledge[:8]},
                 {"title": "最近提到的事", "items": context[:6]}]
     sections = [s for s in sections if s["items"]]
+    interests = [r for r in knowledge if r["memory_type"] in {"useful_preference", "personal_view"} and r["subject"] == "other"]
+    by_id = {f["id"]: f for f in public["facts"]}
+    prior_topics = [topic_grams(f["topic"]) for f in public["facts"]
+                    if f.get("kind") == "preference" and f.get("status") in {"confirmed", "corrected"}]
+    # Continuity only ranks presentation; it does not validate or strengthen a claim.
+    interests.sort(key=lambda r: (any(topic_grams(r["topic"]) & old for old in prior_topics),
+                                 by_id[r["id"]].get("retention") == "conditional",
+                                 r.get("observed_on") or "",
+                                 min(len({e["quote"] for e in r["evidence"]}), 4)), reverse=True)
+    legacy = []
+    for f in public["facts"]:
+        if (f.get("memory_version") == 3 or f.get("validity") != "current" or f.get("conflict")
+                or f.get("status") not in {"confirmed", "corrected"}):
+            continue
+        if f.get("category") not in {"preference", "style", "trait", "boundary"}:
+            continue
+        legacy.append({"id": f["id"], "topic": f["topic"], "text": f["text"], "scope": f.get("context", ""),
+                       "source": "旧版摘录，待复核", "subject": "other", "memory_type": "legacy",
+                       "evidence": f.get("evidence", []), "observed_on": f.get("observed_on")})
+    interests.extend(r for r in legacy if by_id[r["id"]].get("category") == "preference"
+                     and not any(r["topic"] == current["topic"] for current in interests))
+    characteristics = [r for r in knowledge if r["memory_type"] in {"situated_trait", "shared_understanding", "user_note"}]
+    characteristics.extend(r for r in legacy if by_id[r["id"]].get("category") in {"style", "trait"})
+    boundaries = [r for r in knowledge if r["memory_type"] in {"boundary", "communication_request"}
+                  and by_id[r["id"]].get("retention") == "conditional"]
+    portrait = [{"title": "兴趣与关注", "items": interests[:4]},
+                {"title": "沟通特点", "items": characteristics[:4]},
+                {"title": "关系与边界", "items": (stances + boundaries)[:4]}]
+    portrait = [group for group in portrait if group["items"]]
     methods = [c for c in public["method_cards"]
                if c.get("memory_type") not in CONTEXT_TYPES | {"relationship_position"}]
     methods.sort(key=lambda c: (c.get("memory_type") == "boundary", c.get("observed_on") or ""), reverse=True)
+    interest_order = {r["id"]: i for i, r in enumerate(interests)}
+    methods.sort(key=lambda c: (c.get("memory_type") == "boundary",
+                               -interest_order.get(c["fact_id"], 100), c.get("observed_on") or ""), reverse=True)
     visible_methods=[]
     # Include one boundary, one response habit and one constructive topic where present.
     for kinds in ({"boundary"},{"communication_request","support_need","situated_trait"},{"useful_preference","personal_view"}):
@@ -74,6 +111,7 @@ def board_for(public):
             break
         if c not in visible_methods:
             visible_methods.append(c)
+    visible_methods.sort(key=lambda c: (c.get("memory_type") != "boundary", interest_order.get(c["fact_id"], 100)))
     timeline = []
     for f in usable:
         if f.get("versions"):
@@ -85,11 +123,11 @@ def board_for(public):
                                      "after": following_text, "date": following.get("observed_on"),
                                      "scene": f.get("scene", "everyday"), "manual": bool(f.get("manual_locked"))})
     timeline.sort(key=lambda r: r["date"] or "", reverse=True)
-    return {"sections": sections, "methods": visible_methods, "stances": stances[:6], "interactions": interactions[:6],
+    return {"sections": sections, "portrait": portrait, "methods": visible_methods, "stances": stances[:6], "interactions": interactions[:6],
             "reviews": [{"id": f["id"], "topic": f["topic"], "before": f["text"], "after": f["alternatives"][-1]["text"]}
                         for f in public["facts"] if f.get("conflict") and f.get("alternatives") and not f.get("manual_locked")],
             "timeline": timeline[:12], "pending": sum(bool(f.get("conflict") or f.get("retention") == "pending") for f in public["facts"]),
             "unknowns": (["只有过去的表达，不能据此确定对方现在的态度。"] if stances and all(r["historical"] for r in stances) else
                          ["还没有对方明确表达的关系态度；友好互动不能代替这个答案。"]
                          if not any(r["subject"] == "other" and any(re.search(r"你|我们|咱们|做朋友|当朋友", e["quote"]) for e in r["evidence"] if e["role"] == "other") for r in stances) else []),
-            "version": "archive-v5.0"}
+            "version": "archive-v6.0"}

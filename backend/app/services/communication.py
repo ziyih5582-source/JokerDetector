@@ -16,8 +16,8 @@ from app.schemas.communication import Candidate
 from app.services.dossier import check_revision, import_metadata, save, topic_key
 from app.services.profiles import SENSITIVE, normalize, now, redact
 
-PROMPT_VERSION = "archive-evidence-v5.3"
-POLICY_VERSION = "archive-guards-v5.3"
+PROMPT_VERSION = "archive-evidence-v6.1"
+POLICY_VERSION = "archive-guards-v6.1"
 TYPES = {
     "communication_request": "沟通要求", "boundary": "边界", "support_need": "支持需要",
     "situated_trait": "情境特点", "shared_understanding": "共同理解与澄清",
@@ -88,6 +88,9 @@ def validate_items(raw, messages, *, semantic_checked=False, precheck=False):
         if len(ids) != len(c["evidence"]):
             rejected.append("引用不存在、重复或含敏感内容")
             continue
+        if any(by_id[i]["content"].startswith("【引用旧消息】") for i in ids):
+            rejected.append("引用旧消息不能作为本次独立发言依据")
+            continue
         expected_role = c["subject"] if c["subject"] != "relation" else None
         if not precheck and expected_role and expected_role not in roles:
             rejected.append("人物归属与引用不一致")
@@ -96,6 +99,16 @@ def validate_items(raw, messages, *, semantic_checked=False, precheck=False):
                 or c["memory_type"] in {"shared_understanding", "interaction_signal"}) and roles != {"self", "other"}:
             rejected.append("互动结论缺少双方依据")
             continue
+        if (not precheck and c["memory_type"] == "interaction_signal"
+                and re.search(r"约定|答应|同意|达成|接受.*邀|确定.*见面", c["fact"])
+                and not re.search(r"没有.{0,4}(?:约定|答应|同意)|未.{0,4}(?:约定|答应|同意|达成|接受)|只是提议", c["fact"])):
+            first_role = by_id[min(ids)]["role"]
+            replies = [e["quote"] for e in c["evidence"] if by_id[e["message_id"]]["role"] != first_role
+                       and re.search(r"可以|好的|好啊|好呀|(?:^|[，。；\s])(?:好|行|收到)(?:[，。！!\s]|$)|行啊|行呀|没问题|那就|就这么定|答应|同意|愿意|\b(?:ok|yes)\b", e["quote"], re.I)
+                       and not re.search(r"不想|不要|不用|不愿|不同意|不答应|不可以|你.*(?:同意|愿意)|[?？]", e["quote"])]
+            if not replies:
+                rejected.append("双方约定缺少明确接受的回应，不能把提议写成达成")
+                continue
         relevant = [e["quote"] for e in c["evidence"] if by_id[e["message_id"]]["role"] == c["subject"]]
         if relevant and all(THIRD_PERSON.search(q.strip()) and not OWN_TURN.search(q) for q in relevant):
             rejected.append("只有第三人转述，不能给本人建事实")
@@ -320,12 +333,29 @@ def metadata_for(store, profile, messages, chat_date, scene, origin):
     # v2 and local extraction must not prevent an explicit semantic upgrade.
     modes={"communication_ai","communication_local"} if origin=="local" else {"communication_ai"}
     prior={**profile,"batches":[b for b in profile["batches"] if b["mode"] in modes]}
-    metadata,duplicate,overlap=import_metadata(store,prior,messages,chat_date,scene)
+    active_prior = {**prior, "batches": [b for b in prior["batches"]
+                    if b.get("engine") == PROMPT_VERSION and b.get("policy_version") == POLICY_VERSION]}
+    metadata,duplicate,overlap=import_metadata(store,active_prior,messages,chat_date,scene)
     metadata["fingerprint"]=store.digest([metadata["fingerprint"],PROMPT_VERSION,POLICY_VERSION])
     duplicate=any(b["fingerprint"]==metadata["fingerprint"] for b in prior["batches"])
     duplicate=duplicate or any(c["fingerprint"]==metadata["fingerprint"] and c["origin"]==origin
                                for c in profile.get("recognition_cache",[]))
     return metadata,duplicate,overlap
+
+
+def message_source_date(message):
+    """Only user-confirmed screenshot calendar metadata can date an observation."""
+    if not message.get("time_confirmed"):
+        return None
+    raw = re.sub(r"[\s.]", "", message.get("source_time") or "")
+    match = re.match(r"^(\d{1,2})/(\d{1,2})/(20\d{2}|\d{2})(?=\d{1,2}:)", raw)
+    if not match:
+        return None
+    month, day, year = map(int, match.groups())
+    try:
+        return date(year if year > 99 else 2000+year, month, day).isoformat()
+    except ValueError:
+        return None
 
 
 def plan(store, profile, messages, candidates, chat_date=None, scene="", origin="ai"):
@@ -337,8 +367,11 @@ def plan(store, profile, messages, candidates, chat_date=None, scene="", origin=
         return [],metadata,True
     by_id = {m["id"]:m for m in messages}
     changes = []
+    batch_chat_date = chat_date
     for c in sorted(candidates,key=lambda x:x["last_message_id"]):
         c = copy.deepcopy(c)
+        dates = [message_source_date(by_id[e["message_id"]]) for e in c["evidence"]]
+        chat_date = max((d for d in dates if d), default=batch_chat_date)
         # Overlapping context may be essential to a newly completed repair episode.
         # Skip old-only observations, but retain context when new evidence completes it.
         if all(e["message_id"] in overlap for e in c["evidence"]):
@@ -415,11 +448,12 @@ def plan(store, profile, messages, candidates, chat_date=None, scene="", origin=
         session_key = store.digest([chat_date,metadata["message_keys"]])
         for e in c["evidence"]:
             role = by_id[e["message_id"]]["role"]
-            key = store.digest([role,normalize(e["quote"]),chat_date])
+            quote_date = message_source_date(by_id[e["message_id"]]) or chat_date
+            key = store.digest([role,normalize(e["quote"]),quote_date])
             if any(old.get("key")==key for old in target["evidence"]):
                 continue
             evidence.append({"key":key,"quote":e["quote"],"role":role,"message_number":e["message_id"]+1,
-                "chat_date":chat_date,"at":now(),"scene":scene,"historical":action=="historical",
+                "chat_date":quote_date,"at":now(),"scene":scene,"historical":action=="historical",
                 "context_only":e["message_id"] in overlap,
                 "source_session":session_key})
         upgrading=not adding and target.get("origin")=="local" and origin=="ai" and not target["manual_locked"]
@@ -528,6 +562,7 @@ def commit(store, contact_id, token):
                 p["facts"][index]=f
         meta=payload["metadata"]
         p["batches"].append({"id":batch_id,"fingerprint":meta["fingerprint"],"message_keys":meta["message_keys"],
+            "engine":meta.get("engine",PROMPT_VERSION),"policy_version":meta.get("policy_version",POLICY_VERSION),
             "chat_date":meta["chat_date"],"scene":meta["scene"],"message_count":meta["message_count"],"at":now(),
             "mode":"communication_"+payload["origin"],"warning":None,
             "changes":[{"fact_id":c["fact_id"],"action":c["action"],"text":c["state"]["text"]} for c in payload["changes"]]})
@@ -586,6 +621,11 @@ def cards_for(p):
         # Old single-event needs are history, not today's prescription.
         if f["retention"]=="temporary" and f.get("observed_on")!=today():
             continue
+        if f.get("retention") == "episode" and f.get("memory_type") in {"communication_request", "boundary", "support_need"} and f.get("observed_on") != today():
+            continue  # A dated past request is not a standing instruction for today.
+        if (f.get("retention") == "episode" and f.get("memory_type") == "personal_view"
+                and f.get("scene") != "interests" and f.get("observed_on") != today()):
+            continue  # A past travel/safety episode cannot prescribe action now.
         if f["memory_type"]=="event" and f.get("event_date") and f["event_date"]<today():
             continue
         variants=[{"scope":f["context"],"fact":f["text"],"method":f.get("method",""),"example":f.get("example",""),"limitation":f.get("limitation","")}]+f.get("branches",[])
@@ -647,6 +687,10 @@ def save_note(store,contact_id,revision,text,fact_id=None,use_in_ai=False):
 def relevant_facts(p, query="", limit=12):
     candidates=[f for f in p["facts"] if f.get("use_in_ai",True) and f.get("validity","current") not in {"needs_confirmation","superseded"}
                 and f.get("retention")!="pending"]
+    if not re.search(r"过去|之前|当时|那次|那天|历史|\d+月\d+", query):
+        candidates = [f for f in candidates if not (f.get("retention") == "episode"
+                      and f.get("memory_type") in {"communication_request", "boundary", "support_need"}
+                      and f.get("observed_on") != today())]
     words=set(re.findall(r"[A-Za-z]{2,}|[一-龥]{2,}",query))
     words.update(s[i:i+2] for s in re.findall(r"[一-龥]{2,}",query) for i in range(len(s)-1))
     # Chinese clauses also need subword matches for common life scenes.

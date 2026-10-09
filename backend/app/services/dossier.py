@@ -136,6 +136,11 @@ def new_fact(store, c, timestamp):
 
 def prepare_import(data):
     messages = prepare_messages(data["messages"], data["self_speaker"], data["other_speaker"])
+    if data.get("source_kind") in {"ocr", "corrected_transcript"}:
+        for message, original in zip(messages, data["messages"], strict=True):
+            message["source_time"] = original.get("time")
+            message["time_confirmed"] = data.get("time_reliability") == "confirmed"
+            message["kind"] = original.get("kind", "text")
     return messages, data.get("chat_date"), redact(data["scene"].strip())
 
 

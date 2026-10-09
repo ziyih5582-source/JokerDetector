@@ -343,7 +343,7 @@
     if (!p) return;
 
     $('profile-name').textContent = p.name;
-    $('profile-meta').textContent = (p.relationship_tags || []).join(' · ') + ' · 已整理 ' + p.batches.length + ' 段聊天';
+    $('profile-meta').textContent = ((p.relationship_tags || []).length ? p.relationship_tags.join(' · ') + ' · ' : '') + '档案已更新 ' + p.batches.length + ' 次';
     $('fact-count').textContent = p.memory_summary ? p.memory_summary.records : p.facts.length;
     $('review-count').textContent = p.facts.filter(function (f) {
       return f.memory_version === 3 ? f.retention === 'pending' || f.conflict : f.status === 'unreviewed' || f.conflict;

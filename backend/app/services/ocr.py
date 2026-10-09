@@ -76,6 +76,7 @@ _TIME_MARKER_PATTERNS = [
     re.compile(r"^(?:周[一二三四五六日天]|星期[一二三四五六日天])\s*" + _TIME_ONLY + r"$"),
     re.compile(r"^\d{1,2}月\d{1,2}日(?:\s*(?:凌晨|早上|上午|中午|下午|晚上|傍晚))?(?:\s*" + _TIME_ONLY + r")?$"),
     re.compile(r"^\d{4}[-/年]\d{1,2}[-/月]\d{1,2}日?(?:\s*(?:凌晨|早上|上午|中午|下午|晚上|傍晚))?(?:\s*" + _TIME_ONLY + r")?$"),
+    re.compile(r"^\d{1,2}/\d{1,2}/(?:20\d{2}|\d{2})\s*" + _TIME_ONLY + r"\s*(?:AM|PM)$", re.I),
 ]
 
 _NOISE_PATTERNS = [
@@ -93,8 +94,21 @@ _VOICE_PATTERN = re.compile(r"^\d{1,3}\s*['\"\u2019\u2032]{1,2}\s*$")
 
 
 def is_time_marker(text: str) -> bool:
-    text = (text or "").strip()
+    text = canonical_time_marker(text)
     return any(p.match(text) for p in _TIME_MARKER_PATTERNS)
+
+
+def canonical_time_marker(text: str) -> str:
+    """Normalize OCR spacing and duplicated English calendar separators only."""
+    text = (text or "").strip()
+    compact = re.sub(r"[\s.]", "", text)
+    calendar = r"\d{1,2}/\d{1,2}/(?:20\d{2}|\d{2})\d{1,2}:\d{2}(?:AM|PM)"
+    match = re.fullmatch(r"(" + calendar + r")\1", compact, re.I)
+    if match:
+        return match[1]
+    if re.fullmatch(calendar, compact, re.I):
+        return compact
+    return text
 
 
 def is_noise(text: str) -> bool:
@@ -144,7 +158,10 @@ def _header_cut(boxes: list[dict], image_width: int) -> float:
     """消息内容的顶部界线：有标题就取标题下沿，否则取固定顶栏高度。"""
     box = _title_box(boxes, image_width)
     if box is not None:
-        return box["bottom"] + HEADER_PAD_RATIO * image_width
+        captions = [b for b in boxes if box["bottom"] < b["top"] and b["cy"] < .26 * image_width
+                    and abs(b["cx"] - image_width/2) < .12 * image_width and not is_time_marker(b["text"])]
+        bottom = max([box["bottom"]] + [b["bottom"] for b in captions])
+        return bottom + HEADER_PAD_RATIO * image_width
     return HEADER_BAND_RATIO * image_width
 
 
@@ -267,9 +284,10 @@ def _group_text_boxes(boxes: list[dict], image_width: int) -> list[dict]:
     for box in ordered:
         left_margin = box["left"]
         right_margin = float(image_width) - box["right"]
-        side = OTHER_SPEAKER if left_margin <= right_margin else SELF_SPEAKER
+        side = box.get("speaker_hint") or (OTHER_SPEAKER if left_margin <= right_margin else SELF_SPEAKER)
         anchor = box["left"]
-        if current is None or side != current["side"]:
+        quoted = bool(box.get("quoted"))
+        if current is None or side != current["side"] or quoted != current["quoted"]:
             current = None
         else:
             gap = box["top"] - current["bottom"]
@@ -283,6 +301,7 @@ def _group_text_boxes(boxes: list[dict], image_width: int) -> list[dict]:
                 "top": box["top"],
                 "bottom": box["bottom"],
                 "anchor": anchor,
+                "quoted": quoted,
             }
             groups.append(current)
         else:
@@ -303,11 +322,11 @@ def _propagate_times(messages: list[dict], markers: list[dict]) -> None:
             active = ordered_markers[index]
             index += 1
         if active is not None:
-            message["time"] = active["text"]
+            message["time"] = canonical_time_marker(active["text"])
             message["time_guessed"] = active["_used"]
             active["_used"] = True
         elif ordered_markers:
-            message["time"] = ordered_markers[0]["text"]
+            message["time"] = None
             message["time_guessed"] = True
         else:
             message["time"] = None
@@ -323,6 +342,8 @@ def _text_messages(boxes: list[dict], image_width: int, image_height: int | None
     messages = []
     for group in _group_text_boxes(content, image_width):
         text = "".join(group["lines"]).strip()
+        if group["quoted"]:
+            text = "【引用旧消息】" + text
         if not text:
             continue
         messages.append({
@@ -555,6 +576,7 @@ def detect_avatars(image: Image.Image, boxes: list[dict], image_width: int, imag
 def build_messages(image: Image.Image, boxes: list[dict]) -> list[dict]:
     """完整流程：文字消息 + 无文字气泡，合并后统一传播时间。"""
     width, height = image.size
+    boxes = bubble_speaker_hints(image, boxes)
     markers = [
         b for b in boxes
         if is_time_marker(b["text"]) and not _is_text_chrome(b, boxes, width, height)
@@ -567,6 +589,38 @@ def build_messages(image: Image.Image, boxes: list[dict]) -> list[dict]:
     merged = text_messages + extra
     _propagate_times(merged, markers)
     return _strip(sorted(merged, key=lambda m: m["_y"]))
+
+
+def bubble_speaker_hints(image: Image.Image, boxes: list[dict]) -> list[dict]:
+    """Prefer visible bubble colour over text width; long lines cross the centre.
+
+    Geometry stays as a fallback for themes where colour cannot identify a side.
+    Gray reply excerpts are marked as quotations, never new independent speech.
+    """
+    width, height = image.size
+    rgb = image.convert("RGB")
+    result = []
+    for original in boxes:
+        b = dict(original)
+        x1, x2 = max(0, int(b["left"])), min(width, int(b["right"]))
+        y1, y2 = max(0, int(b["top"])), min(height, int(b["bottom"]))
+        if x2 <= x1 or y2 <= y1 or is_time_marker(b["text"]):
+            result.append(b)
+            continue
+        pixels = np.asarray(rgb.crop((x1, y1, x2, y2))).astype(np.int16)
+        red, green, blue = pixels[..., 0], pixels[..., 1], pixels[..., 2]
+        green_fill = (green > 140) & (green > red + 30) & (green > blue + 30)
+        white_fill = (red > 249) & (green > 249) & (blue > 249)
+        quote_fill = (red >= 205) & (red <= 228) & (np.abs(red-green) < 5) & (np.abs(red-blue) < 5)
+        if float(green_fill.mean()) > .3:
+            b["speaker_hint"] = SELF_SPEAKER
+        elif (float(white_fill.mean()) > .5
+              and min(rgb.getpixel((min(2, width-1), min(height-1, max(0, int(b["cy"])))))) < 247):
+            b["speaker_hint"] = OTHER_SPEAKER
+        elif float(quote_fill.mean()) > .5 and re.search(r"[:：]", b["text"]):
+            b["quoted"] = True
+        result.append(b)
+    return result
 
 
 def _same_message(left: dict, right: dict) -> bool:
