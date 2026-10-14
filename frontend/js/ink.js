@@ -610,7 +610,6 @@
   var OCR_KINDS = [['text', '文字'], ['sticker', '表情'], ['image', '图片'], ['voice', '语音']];
   var OCR_KIND_LABEL = { text: '文字', sticker: '表情', image: '图片', voice: '语音' };
   var OCR_KIND_DEFAULT = { text: '', sticker: '[表情]', image: '[图片]', voice: '[语音]' };
-  var OCR_EMOTIONS = ['', '开心', '伤心', '生气', '惊讶', '无语', '害羞', '爱心', '疑问'];
 
   function labeledSelect(options, value, onPick, title) {
     var select = el('select', 'ocr-select');
@@ -662,12 +661,6 @@
     return speaker === '对方' ? (state.ocrOtherName || '对方') : '我';
   }
 
-  function emotionOptions(message) {
-    var emotions = OCR_EMOTIONS.slice();
-    if (message.emoji_emotion && emotions.indexOf(message.emoji_emotion) < 0) emotions.push(message.emoji_emotion);
-    return emotions.map(function (emotion) { return [emotion, emotion || '情绪?']; });
-  }
-
   function applyKindChange(message, value) {
     var previous = OCR_KIND_DEFAULT[message.kind] || '';
     message.kind = value;
@@ -680,6 +673,43 @@
     $('image-dialog-img').src = source;
     var dialog = $('image-dialog');
     if (dialog.showModal) dialog.showModal();
+  }
+
+  function autoGrow(node) {
+    node.style.height = 'auto';
+    node.style.height = (node.scrollHeight + 2) + 'px';
+  }
+
+  function avatarFor(speaker) {
+    var avatars = state.ocrAvatars;
+    if (!avatars) return null;
+    var side = speaker === '我' ? avatars.self : avatars.other;
+    return (side && side.image) || null;
+  }
+
+  function makeFace(speaker, display) {
+    var source = avatarFor(speaker);
+    if (source) {
+      var image = el('img', 'ocr-face ocr-face-img');
+      image.src = source;
+      image.alt = display;
+      return image;
+    }
+    return el('div', 'ocr-face', display.slice(0, 1));
+  }
+
+  function makeContentInput(message, onChange) {
+    var content = document.createElement('textarea');
+    content.rows = 1;
+    content.className = 'ocr-content';
+    content.value = message.content;
+    content.placeholder = '消息内容';
+    content.addEventListener('input', function () {
+      message.content = content.value;
+      autoGrow(content);
+      if (onChange) onChange();
+    });
+    return content;
   }
 
   function needsVision(message) {
@@ -756,38 +786,87 @@
     state.messages.forEach(function (message, index) {
       var visual = isVisualKind(message.kind);
       var expanded = visual || !!message.open;
-      var row = el('div', 'ocr-row' + (expanded ? '' : ' closed'));
+      var mine = message.speaker === '我';
+      var row = el('div', 'ocr-row ' + (mine ? 'side-self' : 'side-other') + (expanded ? '' : ' closed'));
       row.dataset.kind = message.kind || 'text';
 
-      var head = el('div', 'ocr-row-head');
-      head.append(el('span', 'ocr-index', String(index + 1)));
-      if (visual) {
-        head.append(labeledSelect(speakerOptions(), message.speaker, function (value) {
+      var line = el('div', 'ocr-line');
+      var face = makeFace(message.speaker, displayName(message.speaker));
+      var bubble;
+      if (expanded) {
+        bubble = el('div', 'ocr-bubble' + (visual ? ' ocr-bubble-visual' : ''));
+        if (visual && message.image) {
+          var thumb = document.createElement('img');
+          thumb.className = 'ocr-thumb';
+          thumb.src = message.image;
+          thumb.alt = kindLabel(message.kind);
+          thumb.title = '点击查看大图';
+          thumb.addEventListener('click', function () { openImageView(message.image); });
+          bubble.append(thumb);
+        }
+        bubble.append(makeContentInput(message, schedulePreview));
+      } else {
+        bubble = el('button', 'ocr-bubble ocr-bubble-text', message.content);
+        bubble.type = 'button';
+        bubble.title = '点击展开修改';
+        bubble.addEventListener('click', function () {
+          message.open = true;
+          renderOcrReview(warning);
+        });
+      }
+      if (mine) {
+        line.append(bubble);
+        line.append(face);
+      } else {
+        line.append(face);
+        line.append(bubble);
+      }
+      row.append(line);
+
+      var meta = el('div', 'ocr-meta');
+      meta.append(el('span', 'ocr-index', String(index + 1)));
+      meta.append(el('span', 'ocr-meta-name', displayName(message.speaker)));
+      meta.append(el('span', 'ocr-meta-time', timeLabel(message)));
+      if (expanded) {
+        meta.append(labeledSelect(speakerOptions(), message.speaker, function (value) {
           message.speaker = value;
+          renderOcrReview(warning);
           schedulePreview();
         }, '这条是谁说的'));
-        head.append(labeledSelect(OCR_KINDS, message.kind, function (value) {
+        meta.append(labeledSelect(OCR_KINDS, message.kind, function (value) {
           applyKindChange(message, value);
           renderOcrReview(warning);
           schedulePreview();
         }, '消息类型'));
-        head.append(labeledSelect(emotionOptions(message), message.emoji_emotion || '', function (value) {
-          message.emoji_emotion = value;
-          schedulePreview();
-        }, '表情情绪（可自动或手选）'));
+        var time = document.createElement('input');
+        time.type = 'text';
+        time.className = 'ocr-time';
+        time.value = message.time || '';
+        time.placeholder = '时间（可空）';
+        time.addEventListener('input', function () {
+          message.time = time.value;
+          message.time_guessed = false;
+          updateTimeBadge(meta, message);
+        });
+        meta.append(time);
+        updateTimeBadge(meta, message);
+        if (!visual) {
+          var collapse = el('button', 'line-btn quiet', '收起');
+          collapse.type = 'button';
+          collapse.addEventListener('click', function () {
+            message.open = false;
+            renderOcrReview(warning);
+          });
+          meta.append(collapse);
+        }
       } else {
-        var summary = el('button', 'ocr-summary');
-        summary.type = 'button';
-        summary.title = expanded ? '点击收起修改' : '点击展开修改';
-        summary.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-        summary.append(el('span', 'ocr-speaker', displayName(message.speaker)));
-        summary.append(el('span', 'ocr-meta', kindLabel(message.kind) + ' · ' + timeLabel(message)));
-        summary.append(el('span', 'ocr-preview', message.content));
-        summary.addEventListener('click', function () {
-          message.open = !message.open;
+        var expand = el('button', 'line-btn quiet', '展开修改');
+        expand.type = 'button';
+        expand.addEventListener('click', function () {
+          message.open = true;
           renderOcrReview(warning);
         });
-        head.append(summary);
+        meta.append(expand);
       }
       var remove = el('button', 'line-btn quiet ocr-del', '删除');
       remove.type = 'button';
@@ -797,72 +876,12 @@
         updateOcrCount();
         schedulePreview();
       });
-      head.append(remove);
-      row.append(head);
-
-      if (expanded) {
-        var body = el('div', 'ocr-row-body');
-        if (visual && message.image) {
-          var thumb = document.createElement('img');
-          thumb.className = 'ocr-thumb';
-          thumb.src = message.image;
-          thumb.alt = kindLabel(message.kind);
-          thumb.title = '点击查看大图';
-          thumb.addEventListener('click', function () { openImageView(message.image); });
-          body.append(thumb);
-        }
-        if (!visual) {
-          var controls = el('div', 'ocr-row-controls');
-          controls.append(labeledSelect(speakerOptions(), message.speaker, function (value) {
-            message.speaker = value;
-            schedulePreview();
-          }, '这条是谁说的'));
-          controls.append(labeledSelect(OCR_KINDS, message.kind || 'text', function (value) {
-            applyKindChange(message, value);
-            renderOcrReview(warning);
-            schedulePreview();
-          }, '消息类型'));
-          body.append(controls);
-        }
-        var content = document.createElement('input');
-        content.type = 'text';
-        content.className = 'ocr-content';
-        content.value = message.content;
-        content.placeholder = '消息内容';
-        content.addEventListener('input', function () {
-          message.content = content.value;
-          schedulePreview();
-        });
-        body.append(content);
-
-        var foot = el('div', 'ocr-row-foot');
-        var time = document.createElement('input');
-        time.type = 'text';
-        time.className = 'ocr-time';
-        time.value = message.time || '';
-        time.placeholder = '时间（可空）';
-        time.addEventListener('input', function () {
-          message.time = time.value;
-          message.time_guessed = false;
-          updateTimeBadge(foot, message);
-        });
-        foot.append(time);
-        updateTimeBadge(foot, message);
-        if (!visual) {
-          var collapse = el('button', 'line-btn quiet ocr-collapse', '收起');
-          collapse.type = 'button';
-          collapse.addEventListener('click', function () {
-            message.open = false;
-            renderOcrReview(warning);
-          });
-          foot.append(collapse);
-        }
-        body.append(foot);
-        row.append(body);
-      }
+      meta.append(remove);
+      row.append(meta);
       table.append(row);
     });
     $('ocr-review').hidden = false;
+    Array.prototype.forEach.call(table.querySelectorAll('textarea.ocr-content'), autoGrow);
     syncVisionRetry();
   }
 
@@ -1914,48 +1933,15 @@ bindMetricTooltip(label, metricKey, metric);
     state.jokerMessages.forEach(function (message, index) {
       var visual = isVisualKind(message.kind);
       var expanded = visual || !!message.open;
-      var row = el('div', 'ocr-row' + (expanded ? '' : ' closed'));
+      var mine = message.speaker === '我';
+      var row = el('div', 'ocr-row ' + (mine ? 'side-self' : 'side-other') + (expanded ? '' : ' closed'));
       row.dataset.kind = message.kind || 'text';
 
-      var head = el('div', 'ocr-row-head');
-      head.append(el('span', 'ocr-index', String(index + 1)));
-      if (visual) {
-        head.append(labeledSelect(jokerSpeakerOptions(), message.speaker, function (value) {
-          message.speaker = value;
-        }, '这条是谁说的'));
-        head.append(labeledSelect(OCR_KINDS, message.kind, function (value) {
-          applyKindChange(message, value);
-          renderJokerOcrReview(warning);
-        }, '消息类型'));
-        head.append(labeledSelect(emotionOptions(message), message.emoji_emotion || '', function (value) {
-          message.emoji_emotion = value;
-        }, '表情情绪（可自动或手选）'));
-      } else {
-        var summary = el('button', 'ocr-summary');
-        summary.type = 'button';
-        summary.title = expanded ? '点击收起修改' : '点击展开修改';
-        summary.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-        summary.append(el('span', 'ocr-speaker', jokerDisplayName(message.speaker)));
-        summary.append(el('span', 'ocr-meta', kindLabel(message.kind) + ' · ' + timeLabel(message)));
-        summary.append(el('span', 'ocr-preview', message.content));
-        summary.addEventListener('click', function () {
-          message.open = !message.open;
-          renderJokerOcrReview(warning);
-        });
-        head.append(summary);
-      }
-      var remove = el('button', 'line-btn quiet ocr-del', '删除');
-      remove.type = 'button';
-      remove.addEventListener('click', function () {
-        state.jokerMessages.splice(index, 1);
-        renderJokerOcrReview(warning);
-        $('joker-message-count').textContent = '已识别 ' + state.jokerMessages.length + ' 条，请逐条核对';
-      });
-      head.append(remove);
-      row.append(head);
-
+      var line = el('div', 'ocr-line');
+      var face = makeFace(message.speaker, jokerDisplayName(message.speaker));
+      var bubble;
       if (expanded) {
-        var body = el('div', 'ocr-row-body');
+        bubble = el('div', 'ocr-bubble' + (visual ? ' ocr-bubble-visual' : ''));
         if (visual && message.image) {
           var thumb = document.createElement('img');
           thumb.className = 'ocr-thumb';
@@ -1963,30 +1949,40 @@ bindMetricTooltip(label, metricKey, metric);
           thumb.alt = kindLabel(message.kind);
           thumb.title = '点击查看大图';
           thumb.addEventListener('click', function () { openImageView(message.image); });
-          body.append(thumb);
+          bubble.append(thumb);
         }
-        if (!visual) {
-          var controls = el('div', 'ocr-row-controls');
-          controls.append(labeledSelect(jokerSpeakerOptions(), message.speaker, function (value) {
-            message.speaker = value;
-          }, '这条是谁说的'));
-          controls.append(labeledSelect(OCR_KINDS, message.kind || 'text', function (value) {
-            applyKindChange(message, value);
-            renderJokerOcrReview(warning);
-          }, '消息类型'));
-          body.append(controls);
-        }
-        var content = document.createElement('input');
-        content.type = 'text';
-        content.className = 'ocr-content';
-        content.value = message.content;
-        content.placeholder = '消息内容';
-        content.addEventListener('input', function () {
-          message.content = content.value;
+        bubble.append(makeContentInput(message));
+      } else {
+        bubble = el('button', 'ocr-bubble ocr-bubble-text', message.content);
+        bubble.type = 'button';
+        bubble.title = '点击展开修改';
+        bubble.addEventListener('click', function () {
+          message.open = true;
+          renderJokerOcrReview(warning);
         });
-        body.append(content);
+      }
+      if (mine) {
+        line.append(bubble);
+        line.append(face);
+      } else {
+        line.append(face);
+        line.append(bubble);
+      }
+      row.append(line);
 
-        var foot = el('div', 'ocr-row-foot');
+      var meta = el('div', 'ocr-meta');
+      meta.append(el('span', 'ocr-index', String(index + 1)));
+      meta.append(el('span', 'ocr-meta-name', jokerDisplayName(message.speaker)));
+      meta.append(el('span', 'ocr-meta-time', timeLabel(message)));
+      if (expanded) {
+        meta.append(labeledSelect(jokerSpeakerOptions(), message.speaker, function (value) {
+          message.speaker = value;
+          renderJokerOcrReview(warning);
+        }, '这条是谁说的'));
+        meta.append(labeledSelect(OCR_KINDS, message.kind, function (value) {
+          applyKindChange(message, value);
+          renderJokerOcrReview(warning);
+        }, '消息类型'));
         var time = document.createElement('input');
         time.type = 'text';
         time.className = 'ocr-time';
@@ -1995,25 +1991,41 @@ bindMetricTooltip(label, metricKey, metric);
         time.addEventListener('input', function () {
           message.time = time.value;
           message.time_guessed = false;
-          updateTimeBadge(foot, message);
+          updateTimeBadge(meta, message);
         });
-        foot.append(time);
-        updateTimeBadge(foot, message);
+        meta.append(time);
+        updateTimeBadge(meta, message);
         if (!visual) {
-          var collapse = el('button', 'line-btn quiet ocr-collapse', '收起');
+          var collapse = el('button', 'line-btn quiet', '收起');
           collapse.type = 'button';
           collapse.addEventListener('click', function () {
             message.open = false;
             renderJokerOcrReview(warning);
           });
-          foot.append(collapse);
+          meta.append(collapse);
         }
-        body.append(foot);
-        row.append(body);
+      } else {
+        var expand = el('button', 'line-btn quiet', '展开修改');
+        expand.type = 'button';
+        expand.addEventListener('click', function () {
+          message.open = true;
+          renderJokerOcrReview(warning);
+        });
+        meta.append(expand);
       }
+      var remove = el('button', 'line-btn quiet ocr-del', '删除');
+      remove.type = 'button';
+      remove.addEventListener('click', function () {
+        state.jokerMessages.splice(index, 1);
+        renderJokerOcrReview(warning);
+        $('joker-message-count').textContent = '已识别 ' + state.jokerMessages.length + ' 条，请逐条核对';
+      });
+      meta.append(remove);
+      row.append(meta);
       table.append(row);
     });
     $('joker-ocr-review').hidden = false;
+    Array.prototype.forEach.call(table.querySelectorAll('textarea.ocr-content'), autoGrow);
   }
 
   async function jokerDetect() {

@@ -32,6 +32,11 @@ def ai_error_detail(exc):
     if any("timeout" in type(e).__name__.lower() for e in chain):
         return {"code": "timeout", "message": "AI 服务响应超时，请稍后重试或缩短聊天片段"}
     status = getattr(exc, "status_code", None)
+    provider_text = str(exc)
+    if "No deployments available" in provider_text or "cooldown" in provider_text.lower():
+        return {"code": "model_unavailable",
+                "message": "所选模型暂无可用实例（服务商部署冷却中），请稍后重试，或换一个模型/服务商",
+                "status": status or 429}
     messages = {
         400: ("invalid_request", "AI 服务拒绝请求，请检查模型 ID 以及服务是否支持 Chat Completions 和 JSON 输出"),
         401: ("authentication", "API Key 无效或已失效，请检查密钥与 API 地址是否属于同一服务商"),
