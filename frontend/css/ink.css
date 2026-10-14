@@ -638,6 +638,7 @@ select {
   transition: border-color .3s ease, background .3s ease;
 }
 .check input:hover { border-color: var(--ink-soft); }
+.check.disabled { opacity: .55; }
 .check input:checked {
   border-color: var(--vermilion-soft);
   background: var(--vermilion-soft) url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14'%3E%3Cpath d='M3.4 7.4l2.4 2.4 4.8-5.4' fill='none' stroke='%23fdfaf3' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
@@ -738,6 +739,26 @@ input[type="range"]::-webkit-slider-thumb {
   max-height: 260px;
   overflow: auto;
 }
+
+#redacted-json {
+  margin: 10px 0 0;
+  padding: 14px 16px;
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--ink-mid);
+  background: linear-gradient(180deg, rgba(255, 253, 248, .92) 0%, rgba(255, 253, 248, .55) 100%);
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--vermilion-soft);
+  border-radius: 3px;
+}
+#redacted-json .json-key { color: var(--vermilion); }
+#redacted-json .json-str { color: #4f7a4a; }
+#redacted-json .json-num { color: #8a6d3b; }
+#redacted-json .json-lit { color: #6b5580; }
 
 /* ---------------------------------------------------------------- 结果页 */
 

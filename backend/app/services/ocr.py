@@ -29,7 +29,7 @@ OTHER_SPEAKER = "对方"
 # 版面重建参数：均为经验值，调参只需改这里
 GROUP_GAP_RATIO = 0.6        # 同侧相邻文本行间距超过「行高 × 该值」即视作新气泡
 GROUP_ALIGN_RATIO = 2.0      # 同侧气泡边缘错位超过「行高 × 该值」即视作新气泡
-BUBBLE_DIFF = 18             # 与页面背景色的通道差超过它才算气泡像素
+BUBBLE_DIFF = 12             # 与页面背景色的通道差超过它才算气泡像素（白底贴纸与浅灰聊天底的差约 18）
 MIN_BUBBLE_W_RATIO = 0.04
 MIN_BUBBLE_H_RATIO = 0.008
 AVATAR_EDGE_RATIO = 0.1      # 贴在最左/最右这么宽内、且尺寸像头像的组件视为头像
@@ -37,7 +37,8 @@ AVATAR_MIN_RATIO = 0.025     # 头像方块最小边宽占比
 AVATAR_MAX_RATIO = 0.18      # 头像方块最大边宽占比
 AVATAR_SQUARE_TOL = 0.35     # 长宽差超过「较长边 × 该值」就不算头像
 COUPLE_THRESHOLD = 0.72      # 两个头像的相似度超过它才提示「疑似情侣头像」
-STICKER_MAX_RATIO = 0.22     # 非文字气泡最大边小于该占比判为表情，否则判为图片
+STICKER_MAX_RATIO = 0.35     # 非文字气泡最大边小于该占比判为表情，否则判为图片
+STICKER_TALL_FACTOR = 1.8    # 带标题的贴纸偏高：宽度够窄、高度不超过宽度的该倍数，也算表情
 TOP_MARGIN_RATIO = 0.02
 BOTTOM_MARGIN_RATIO = 0.02
 
@@ -333,11 +334,13 @@ def _propagate_times(messages: list[dict], markers: list[dict]) -> None:
             message["time_guessed"] = False
 
 
-def _text_messages(boxes: list[dict], image_width: int, image_height: int | None = None) -> list[dict]:
+def _text_messages(boxes: list[dict], image_width: int, image_height: int | None = None,
+                   exclude: list[dict] | None = None) -> list[dict]:
     content = [
         b for b in boxes
         if not is_time_marker(b["text"]) and not is_noise(b["text"])
         and (image_height is None or not _is_text_chrome(b, boxes, image_width, image_height))
+        and not _inside_any(b, exclude or [])
     ]
     messages = []
     for group in _group_text_boxes(content, image_width):
@@ -382,6 +385,45 @@ def _overlaps_text(bubble: dict, boxes: list[dict]) -> bool:
         if box["bottom"] < bubble["top"] or box["top"] > bubble["bottom"]:
             continue
         return True
+    return False
+
+
+def _texts_inside(bubble: dict, boxes: list[dict]) -> str:
+    return "".join(b["text"] for b in boxes
+                   if bubble["left"] <= b["cx"] <= bubble["right"] and bubble["top"] <= b["cy"] <= bubble["bottom"])
+
+
+def _looks_like_graphic(image: Image.Image, bubble: dict, boxes: list[dict]) -> bool:
+    """重叠了文字的气泡，是不是其实是一张「带字的表情包」。
+
+    微信文字气泡只有白/绿两种底色、且文字稀疏；带字表情要么颜色丰富，
+    要么是白底黑线条的线稿（黑色占比高）。另外贴纸里的文字都很短，
+    长文字消息一律按文字处理，避免把正常消息误判成表情。
+    """
+    inner = _texts_inside(bubble, boxes)
+    if not inner or len(inner) > 12:
+        return False
+    try:
+        crop = image.crop((bubble["left"], bubble["top"], bubble["right"], bubble["bottom"])).convert("RGB")
+    except Exception:
+        return False
+    array = np.asarray(crop).astype(np.int16)
+    if array.size == 0:
+        return False
+    red, green, blue = array[..., 0], array[..., 1], array[..., 2]
+    high, low = array.max(axis=2), array.min(axis=2)
+    white = (red > 249) & (green > 249) & (blue > 249)
+    wechat_green = (green > 140) & (green > red + 30) & (green > blue + 30)
+    bubble_bg = white | wechat_green
+    colorful = float((((high - low) > 40) & ~bubble_bg).mean())
+    dark = float((high < 90).mean())
+    return colorful > 0.08 or (dark > 0.2 and float(white.mean()) > 0.3)
+
+
+def _inside_any(box: dict, rects: list[dict]) -> bool:
+    for rect in rects:
+        if rect["left"] <= box["cx"] <= rect["right"] and rect["top"] <= box["cy"] <= rect["bottom"]:
+            return True
     return False
 
 
@@ -435,6 +477,23 @@ def _is_avatar_component(component: dict, image_width: int) -> bool:
     return outer <= AVATAR_EDGE_RATIO * image_width and side <= AVATAR_MAX_RATIO * image_width
 
 
+def _input_bar_top(components: list[dict], image_width: int, image_height: int) -> float | None:
+    """找出底部微信输入条（又宽又矮的白条），返回它的上沿；找不到返回 None。
+
+    聊天输入区常比固定底边区域更高一点，导致输入框与其中的麦克风/表情/加号图标
+    被当成图片；这里按形状精确定位，拼接长截图（没有输入条）不会误裁。
+    """
+    best = None
+    for component in components:
+        if component["w"] < 0.3 * image_width or component["h"] > 0.15 * image_width:
+            continue
+        if component["bottom"] < image_height - 0.35 * image_width:
+            continue
+        if best is None or component["top"] < best["top"]:
+            best = component
+    return best["top"] - 0.015 * image_width if best else None
+
+
 def detect_nontext_bubbles(image: Image.Image, boxes: list[dict], image_width: int, image_height: int) -> list[dict]:
     """用连通域找没有文字的气泡，判为表情或图片。
 
@@ -444,12 +503,16 @@ def detect_nontext_bubbles(image: Image.Image, boxes: list[dict], image_width: i
     min_w = MIN_BUBBLE_W_RATIO * image_width
     min_h = MIN_BUBBLE_H_RATIO * image_width
     min_area = min_w * min_h
+    components = _layout_components(image)
+    input_cut = _input_bar_top(components, image_width, image_height)
     found = []
-    for component in _layout_components(image):
+    for component in components:
         x, y, w, h, area = (component["left"], component["top"], component["w"], component["h"], component["area"])
         if area < min_area or w < min_w or h < min_h:
             continue
         if y <= TOP_MARGIN_RATIO * image_height or y + h >= (1 - BOTTOM_MARGIN_RATIO) * image_height:
+            continue
+        if input_cut is not None and (y + h / 2.0) >= input_cut:
             continue
         if w >= 0.98 * image_width and h >= 0.98 * image_height:
             continue
@@ -459,10 +522,11 @@ def detect_nontext_bubbles(image: Image.Image, boxes: list[dict], image_width: i
         if _is_avatar_component(component, image_width):
             continue
         bubble = {"left": x, "right": x + w, "top": y, "bottom": y + h, "side": side}
-        if _overlaps_text(bubble, boxes):
+        if _overlaps_text(bubble, boxes) and not _looks_like_graphic(image, bubble, boxes):
             continue
         crop = image.crop((x, y, x + w, y + h))
-        if max(w, h) <= STICKER_MAX_RATIO * image_width:
+        limit = STICKER_MAX_RATIO * image_width
+        if max(w, h) <= limit or (w <= limit and h <= limit * STICKER_TALL_FACTOR):
             kind, content = "sticker", "[表情]"
             try:
                 emotion, _score = emoji.classify(crop)
@@ -478,6 +542,7 @@ def detect_nontext_bubbles(image: Image.Image, boxes: list[dict], image_width: i
             "kind": kind,
             "emoji_emotion": emotion,
             "image": _crop_data_url(crop),
+            "_box": bubble,
             "_y": float(y),
         })
     return found
@@ -541,10 +606,14 @@ def _crop_data_url(image: Image.Image, max_side: int = THUMB_MAX_SIDE) -> str:
 def detect_avatars(image: Image.Image, boxes: list[dict], image_width: int, image_height: int) -> dict | None:
     """定位左右两侧头像并给出「疑似情侣头像」的启发式判断（需要 OpenCV）。"""
     left = right = None
-    for component in _layout_components(image):
+    components = _layout_components(image)
+    input_cut = _input_bar_top(components, image_width, image_height)
+    for component in components:
         if not _looks_like_avatar(component, image_width):
             continue
         if _is_component_chrome(component, boxes, image_width, image_height):
+            continue
+        if input_cut is not None and (component["top"] + component["bottom"]) / 2.0 >= input_cut:
             continue
         if _overlaps_text(component, boxes):
             continue
@@ -581,11 +650,13 @@ def build_messages(image: Image.Image, boxes: list[dict]) -> list[dict]:
         b for b in boxes
         if is_time_marker(b["text"]) and not _is_text_chrome(b, boxes, width, height)
     ]
-    text_messages = _text_messages(boxes, width, height)
     try:
         extra = detect_nontext_bubbles(image, boxes, width, height)
     except Exception:  # pragma: no cover - 版面检测失败不应拖垮主流程
         extra = []
+    # 带字表情包里的文字不算聊天文字
+    exclude = [m["_box"] for m in extra if m.get("_box")]
+    text_messages = _text_messages(boxes, width, height, exclude)
     merged = text_messages + extra
     _propagate_times(merged, markers)
     return _strip(sorted(merged, key=lambda m: m["_y"]))
@@ -624,9 +695,15 @@ def bubble_speaker_hints(image: Image.Image, boxes: list[dict]) -> list[dict]:
 
 
 def _same_message(left: dict, right: dict) -> bool:
+    """相同发言者、相同内容、且裁块也相同才视为重复。
+
+    表情/图片的 content 都是 [表情]/[图片]，必须比较 image 裁块，否则相邻的两个
+    不同表情会被误当成重复删掉。
+    """
     return (
         left.get("speaker") == right.get("speaker")
         and str(left.get("content", "")).strip() == str(right.get("content", "")).strip()
+        and left.get("image") == right.get("image")
     )
 
 
@@ -644,14 +721,15 @@ def merge_message_batches(batches: list[list[dict]]) -> tuple[list[dict], int]:
     """按顺序拼接多张截图的消息，并去掉接缝处与图内相邻的重复。返回 (消息, 去掉条数)。
 
     只把「上一张结尾」与「下一张开头」的重叠认定为接缝重复，不会误删对话里本来
-    就重复出现的一句。
+    就重复出现的一句。图片/表情不做图内相邻去重——同一张表情连发两次是正常的。
     """
     merged: list[dict] = []
     removed = 0
     for batch in batches:
         deduped: list[dict] = []
         for message in batch:
-            if deduped and _same_message(deduped[-1], message):
+            previous = deduped[-1] if deduped else None
+            if previous is not None and not _is_visual_message(previous) and _same_message(previous, message):
                 removed += 1
                 continue
             deduped.append(message)
@@ -659,3 +737,7 @@ def merge_message_batches(batches: list[list[dict]]) -> tuple[list[dict], int]:
         removed += overlap
         merged.extend(deduped[overlap:])
     return merged, removed
+
+
+def _is_visual_message(message: dict) -> bool:
+    return message.get("kind") in ("sticker", "image")

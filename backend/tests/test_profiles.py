@@ -260,9 +260,11 @@ def test_deepseek_v4_requests_final_json_without_default_thinking():
     ai.base_url = 'https://api.deepseek.com/v1/'
     extract_ai([{"id": 0, "role": "other", "content": "我喜欢徒步"}], ai, 'deepseek-v4-pro')
     assert ai.calls[0]["extra_body"] == {"thinking": {"type": "disabled"}}
+    extract_ai([{"id": 0, "role": "other", "content": "我喜欢徒步"}], ai, 'deepseek-flash')
+    assert ai.calls[1]["extra_body"] == {"thinking": {"type": "disabled"}}
     ai.base_url = 'https://another-provider.invalid/v1/'
     extract_ai([{"id": 0, "role": "other", "content": "我喜欢徒步"}], ai, 'custom-model')
-    assert "extra_body" not in ai.calls[1]
+    assert "extra_body" not in ai.calls[2]
 
 
 def test_ai_not_configured_is_actionable(client):

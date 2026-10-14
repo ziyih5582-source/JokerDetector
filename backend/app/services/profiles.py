@@ -56,7 +56,9 @@ def ai_error_detail(exc):
 
 
 def ai_request_options(client, model):
-    if urlsplit(str(getattr(client, "base_url", ""))).hostname == "api.deepseek.com" and model.startswith("deepseek-v4"):
+    """DeepSeek 官方的思考模式会占满短输出预算，这里统一关掉，保证短 JSON / 识图短句能正常返回。"""
+    if urlsplit(str(getattr(client, "base_url", ""))).hostname == "api.deepseek.com" \
+            and model.startswith(("deepseek-v4", "deepseek-flash")):
         return {"extra_body": {"thinking": {"type": "disabled"}}}
     return {}
 
@@ -103,10 +105,18 @@ def prepare_messages(messages, self_speaker, other_speaker):
             if len(name) > 1:
                 content = content.replace(name, alias)
         entry = {"id": i, "role": "other" if m["speaker"] == other_speaker else "self", "content": redact(content)}
-        # 表情/图片的情绪作为独立字段：只在存在时写入，避免改变无情绪片段的指纹
+        # 情绪/时间/类型作为独立字段：只在存在时写入，避免改变无这些信息片段的指纹
         emotion = (m.get("emotion") or "").strip()
         if emotion:
             entry["emotion"] = emotion[:32]
+        time_label = (m.get("time") or "").strip()
+        if time_label:
+            entry["time"] = time_label[:32]
+            if m.get("time_guessed"):
+                entry["time_guessed"] = True
+        kind = (m.get("kind") or "").strip()
+        if kind and kind != "text":
+            entry["kind"] = kind[:16]
         result.append(entry)
     return result
 

@@ -458,6 +458,7 @@
     });
     addRipple(x, y, 3);
     if (foods.length > 60) foods.shift();
+    if (!running) drawOnce();
   }
 
   function drawFoods(dt) {
@@ -526,16 +527,11 @@
     buildWash();
     makeMotes();
     spawnFish();
+    if (!running) drawOnce();
   }
 
-  function frame(now) {
-    frameId = requestAnimationFrame(frame);
-    var dt = Math.min((now - lastTime) / 1000 || 0, 0.05);
-    lastTime = now;
+  function render(now, dt) {
     var time = now / 1000;
-
-    fpsAcc += dt; fpsCount++;
-    if (fpsAcc >= 1) { fps = fpsCount / fpsAcc; fpsAcc = 0; fpsCount = 0; }
 
     ctx.clearRect(0, 0, W, H);
     if (washLayer) ctx.drawImage(washLayer, 0, 0, W, H);
@@ -561,6 +557,22 @@
     ctx.fillRect(0, 0, W, H);
   }
 
+  function frame(now) {
+    frameId = requestAnimationFrame(frame);
+    var dt = Math.min((now - lastTime) / 1000 || 0, 0.05);
+    lastTime = now;
+
+    fpsAcc += dt; fpsCount++;
+    if (fpsAcc >= 1) { fps = fpsCount / fpsAcc; fpsAcc = 0; fpsCount = 0; }
+
+    render(now, dt);
+  }
+
+  /** 静水状态：只画一帧，画面留在原地、不继续动。 */
+  function drawOnce() {
+    render(performance.now(), 0);
+  }
+
   function start() {
     if (running) return;
     running = true;
@@ -578,6 +590,7 @@
       canvas = el;
       ctx = canvas.getContext('2d');
       reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      paused = true;                 // 初始为静水：只画一帧，等用户点「继续湖面动画」
       buildMoteSprites();
       resize();
       var t = null;
@@ -588,7 +601,6 @@
       document.addEventListener('visibilitychange', function () {
         if (document.hidden) stop(); else if (!paused) start();
       });
-      start();
     },
     feed: feed,
     ripple: addRipple,

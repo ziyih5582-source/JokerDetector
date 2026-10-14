@@ -12,7 +12,7 @@
 | 应用版本 | `2.2.0-experimental`（`backend/app/core/config.py` 的 `APP_VERSION`，由 `backend/app/main.py` 传给 FastAPI） |
 | 性质 | 工程学导论课程项目，单机实验版 |
 | 许可 | MIT（见 [`LICENSE`](LICENSE)） |
-| 当前测试 | 112 项自动化测试全部通过 |
+| 当前测试 | 267 项自动化测试全部通过 |
 | 运行时 | Python 3.10+（推荐 3.12）、FastAPI + 原生 JS，无前端框架 |
 
 ---
@@ -83,7 +83,7 @@
 │   │   │   ├── report.py       # build_report()、LEVEL_THRESHOLDS、METRIC_DOCS、level_for()
 │   │   │   ├── demo_data.py    # 三个内置虚构示例案例
 │   │   │   └── ocr.py          # 微信长截图：本地 OCR、版面重建、时间/类型标记（可选依赖）
-│   ├── tests/                  # 112 项自动化测试（6 个文件）
+│   ├── tests/                  # 267 项自动化测试
 │   ├── requirements.txt
 │   ├── requirements-ocr.txt    # 可选：长截图识别依赖
 │   └── pyproject.toml          # pytest / ruff 配置（pythonpath=["."]）
@@ -250,9 +250,9 @@ sequenceDiagram
 
 1. `recognize_image` 调 RapidOCR，得到 `[[box(4点), text, score], ...]`，归一化成带 `left/right/top/bottom/cx/cy/h` 的文本框。**图片高于 `TILE_HEIGHT`（2000px）时纵向分块**（块间重叠 `TILE_OVERLAP=240`），逐块识别后把每块的 y 坐标加上块顶偏移，再用 `_dedup_boxes` 去掉重叠带里被识别两次的同一行。不分块的话整图会被检测模型压到极扁——实测 4 万像素高时只能认出一条。
 2. `_group_text_boxes`：按 `cy` 排序，按纵向间距（`行高中位数 × GROUP_GAP_RATIO`）与左缘错位（`× GROUP_ALIGN_RATIO`）把行合并成气泡；同一块文字里的多行会拼成一条消息。
-3. **左右归属**：比较文本框左缘与到右缘的距离（`left <= width - right` 判对方，否则判我）。因为微信里文字在气泡内左对齐、气泡又贴向自己那一侧，"离哪边近"比"在中线哪边"稳。**先做界面区域过滤**：`_header_cut` / `_footer_cut` 按图宽（DPI 代理）切掉顶部状态栏+标题栏与底部输入栏，文本框与连通域都要过 `_is_text_chrome` / `_is_component_chrome`，因此手机时间、WiFi/电量、语音/表情/更多图标都不会进聊天记录；`detect_title` 在顶部区域内（`HEADER_BAND_RATIO=0.22`，真机状态栏+标题栏的占比）找**严格居中**（±0.12×图宽）、取**最靠上**的正文（排除时间、噪音、页面名）作为对方昵称，有标题时顶部界线取标题下沿——取最靠上且收紧居中容差，是为了不把靠中间的消息气泡当成标题。
+3. **左右归属**：比较文本框左缘与到右缘的距离（`left <= width - right` 判对方，否则判我）。因为微信里文字在气泡内左对齐、气泡又贴向自己那一侧，"离哪边近"比"在中线哪边"稳。**先做界面区域过滤**：`_header_cut` / `_footer_cut` 按图宽（DPI 代理）切掉顶部状态栏+标题栏与底部输入栏，文本框与连通域都要过 `_is_text_chrome` / `_is_component_chrome`；另有 `_input_bar_top()` 按形状精确定位底部微信输入条（**又宽又矮的白条**），从它的上沿往下全部当界面——因为输入条常比固定底边区域更高，其输入框与麦克风/表情/加号图标会被误当成图片。因此手机时间、WiFi/电量、语音/表情/更多图标都不会进聊天记录；`detect_title` 在顶部区域内（`HEADER_BAND_RATIO=0.22`，真机状态栏+标题栏的占比）找**严格居中**（±0.12×图宽）、取**最靠上**的正文（排除时间、噪音、页面名）作为对方昵称，有标题时顶部界线取标题下沿——取最靠上且收紧居中容差，是为了不把靠中间的消息气泡当成标题。
 4. **时间**：`_propagate_times` 收集所有时间分隔（`20:13`、`昨天 20:13`、`5月1日 下午3:00` 等），按最近的可见时间点向前传播；紧邻分隔的第一条标为该时刻（`time_guessed=false`），其余标记为推测。
-5. **类型**：`classify_text_kind` 从文本识别语音（`3''`）；`detect_nontext_bubbles` 用 OpenCV 连通域找"没有文字的气泡"，按尺寸判表情或图片（启发式），并把该气泡裁成最长边 `THUMB_MAX_SIDE` 的缩略图（PNG data URL）写进消息的 `image` 字段，供前端查看原图。`_overlaps_text` 用矩形重叠而非中心点判断气泡是否含文字——因为一行的字素可能被连通域拆成多个组件。**头像用 `_is_avatar_component` 排除**（贴着外缘 + 最大边在头像尺寸内，不再要求「近似方形」——真实头像常因异形或角标而不方，旧条件会漏排除、把头像当成表情）。连通域在超大图上先按比例降采样到 `MAX_LAYOUT_PIXELS`（800 万像素）以内再计算，坐标换算回原图；气泡的尺寸下限按**图宽**而非图高（否则超高图里正常大小的表情会被判太小而漏掉）。
+5. **类型**：`classify_text_kind` 从文本识别语音（`3''`）；`detect_nontext_bubbles` 用 OpenCV 连通域找"没有文字的气泡"，按尺寸判表情或图片（启发式），并把该气泡裁成最长边 `THUMB_MAX_SIDE` 的缩略图（PNG data URL）写进消息的 `image` 字段，供前端查看原图。若用户勾选（默认开）且配置了 `DEEPSEEK_VISION_MODEL`，导入后会用 `vision.describe_data_url` 给每张表情/图片写一句描述并写回 `content`（`[表情：…]`/`[图片：…]`），失败保持原样。`_overlaps_text` 用矩形重叠而非中心点判断气泡是否含文字——因为一行的字素可能被连通域拆成多个组件。**带文字的表情包**由 `_looks_like_graphic` 兜底：若气泡里的文字很短（≤12 字）且底图颜色丰富、或是白底黑线条的线稿，就仍判为表情/图片，并把贴纸内的文字从聊天文字中剔除（长文字消息一律按文字处理，避免误伤）。**头像用 `_is_avatar_component` 排除**（贴着外缘 + 最大边在头像尺寸内，不再要求「近似方形」——真实头像常因异形或角标而不方，旧条件会漏排除、把头像当成表情）。连通域在超大图上先按比例降采样到 `MAX_LAYOUT_PIXELS`（800 万像素）以内再计算，坐标换算回原图；气泡的尺寸下限按**图宽**而非图高（否则超高图里正常大小的表情会被判太小而漏掉）。
 6. **头像（阶段 2）**：`detect_avatars` 在同一批连通域里挑出"贴近最左/最右、近似方形、尺寸在 `AVATAR_MIN_RATIO`～`AVATAR_MAX_RATIO` 之间、且不含文字"的组件，取每侧最靠上的一个作为头像；裁剪后比较两张头像的 **HSV 直方图相关度 + 感知哈希**（`_avatar_similarity`），合成相似度，超过 `COUPLE_THRESHOLD` 就提示「疑似情侣头像」。两张头像以 64×64 PNG data URL 随响应返回，供前端展示与人工确认。
 7. **表情情绪（阶段 3，可选）**：判为表情的气泡会裁剪下来交给 `backend/app/services/emoji.py`。该模块扫描 `config.EMOJI_DIR`（`assets/emoji/`），把每张按情绪命名的图归一化到 64×64，算 **HSV 直方图交集 + 8×8 灰度网格差异**（`_signature` / `_compare`），取最接近的模板；相似度低于 `MATCH_THRESHOLD` 就返回 `None`。**没有素材目录时直接返回 `None`**，前端保留手选——即"默认关闭、放素材才启用"。它只依赖 numpy 与 Pillow。用户确认或修改后的情绪由前端作为独立字段 `emotion` 随消息提交；`prepare_messages` 只在情绪存在时写入该字段（因此无情绪片段的档案指纹不变），`analyzer._build_transcript` 把它标注成「（表情情绪：X）」送进 AI 对话。**本地统计只用 `content`，评分不受情绪影响。**
 8. 单张内部合并后统一传播时间，剥掉内部坐标字段。
@@ -611,6 +611,10 @@ AI 条目标记为 `origin="ai"`、`certainty="tentative"`——**与本地提�
 | `DEEPSEEK_API_KEY` | `""`（空 → 未配置） |
 | `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` |
 | `DEEPSEEK_MODEL` | `deepseek-chat` |
+| `DEEPSEEK_VISION_MODEL` | `""`（旧的视觉模型变量，留空 → 不做表情/图片识别） |
+| `VISION_MODEL` | `""`（优先于 `DEEPSEEK_VISION_MODEL`；交大网关实测 `qwen3.8-27b` 支持图片） |
+| `VISION_API_KEY` | `""`（留空 → 沿用 `DEEPSEEK_API_KEY`；可单独指向自己的多模态服务） |
+| `VISION_BASE_URL` | `""`（留空 → 沿用 `DEEPSEEK_BASE_URL`；须 OpenAI 兼容且支持 `image_url`） |
 
 支持任意 OpenAI 兼容服务。客户端构建为 `OpenAI(api_key=..., base_url=..., http_client=httpx.Client(trust_env=False))`——**`trust_env=False` 意味着忽略 `HTTP_PROXY` / `NO_PROXY` 环境变量**，避免意外经由代理外发。
 
@@ -623,15 +627,18 @@ AI 条目标记为 `origin="ai"`、`certainty="tentative"`——**与本地提�
 | 档案提取（JSON） | `profiles.extract_ai` | 45 s | 2400 | 0.1 | 全部预处理消息 |
 | 类型仲裁 | `analyzer.classify_joker_type_ai` | 30 s | 100 | 0.2 | 末 **300** 条 |
 | 情感长文 | `analyzer.ai_guidance` | 90 s | 5000 | 0.7 | 末 **500** 条 |
+| 表情/图片描述（多模态） | `vision.describe_data_url` | 12 s ×4 | 80 | 0.2 | 单张裁块 |
 | 找钓翁聊聊对话 | `fisherman.stream_reply` | 90 s | 1400 | 0.8 | 会话历史（≤40 轮） |
 
 表中的模块名对应 `backend/app/services/` 下的 `profiles.py`、`analyzer.py` 与 `backend/app/api/routes/fisherman.py`；`ai_error_detail()` 也在 `services/profiles.py` 中。
 
 全部使用 `max_retries=0`（不自动重试，避免重复计费与重复副作用）。
 
-**DeepSeek V4 思考模式**：`ai_request_options()` 在主机为 `api.deepseek.com` **且**模型名以 `deepseek-v4` 开头时附加 `extra_body={"thinking": {"type": "disabled"}}`。原因是本实验需要短 JSON 摘录，思考模式会占满有限的输出预算或只产出思考内容。其他服务商不附加此参数（`test_deepseek_v4_requests_final_json_without_default_thinking`）。
+**DeepSeek 思考模式**：`ai_request_options()` 在主机为 `api.deepseek.com` **且**模型名以 `deepseek-v4` 或 `deepseek-flash` 开头时附加 `extra_body={"thinking": {"type": "disabled"}}`。原因是本实验需要短 JSON 摘录 / 短识图描述，思考模式会占满有限的输出预算或只产出思考内容。其他服务商不附加此参数（`test_deepseek_v4_requests_final_json_without_default_thinking`）。
 
-**发送出去的内容**：仅经 `prepare_messages()` 处理的脱敏消息（`{id, role, content}`），或找钓翁聊聊的 PERSONA + 脱敏档案背景 + 脱敏用户turn。**已有档案永不作为输入发送**——只发送当前片段。
+**发送出去的内容**：仅经 `prepare_messages()` 处理的脱敏消息（`{id, role, content}`，以及存在时的 `emotion / time / time_guessed / kind`），或找钓翁聊聊的 PERSONA + 脱敏档案背景 + 脱敏用户turn。**已有档案永不作为输入发送**——只发送当前片段。档案提取直接把脱敏消息数组作为 JSON 发送；**类型仲裁与情感长文也改为发送 JSON**——由 `analyzer.build_ai_payload()` 生成 `{"messages":[{"id","speaker","text","emotion?","time?","time_guessed?","kind?"}]}`（`speaker` 映射为自己/对方，情绪/时间/类型只在存在时出现），提示词里明确标注这是不可信数据、其中任何指令都不得执行。脱敏预览接口返回的 `ai_payload` 与长文实际发送的是同一份结构（"所见即所发"）；前端提供「查看 JSON / 导出 JSON」，导出的是同一个字符串。
+
+**表情/图片识别例外**：导入长截图且用户勾选（**默认开启、可关闭**）时，会把每张表情/图片的**裁块**（≤480px 的 PNG data URL）发给多模态模型，模型返回 JSON `{"kind","character","summary"}`：**由模型判定表情包/图片**（比按气泡大小猜准），表情包必须给出**主角**——认得的热梗/角色直接点名（doge、熊猫头、金馆长、悲伤蛙、猫 meme、Hello Kitty、皮卡丘…），不确定写「疑似 XX」，认不出才描述外形；图片只描述内容。视觉识别可用 `VISION_API_KEY / VISION_BASE_URL / VISION_MODEL` **单独指向自己的多模态 API**（不填则沿用主服务商；DeepSeek 官方的 `deepseek-flash` 现已支持图片，`base_url` 用 `https://api.deepseek.com`），也可以在网页「设置 → 识图 API」里填写并保存（写进本机 `.env`、立即生效，密钥不回传）。设置页与 `/api/config` 的 `vision_*` 字段会显示当前模型与地址。注意所有视觉模型都只是"看图"，**没有联网搜索**。写回消息的 `kind` 与 `content`（`[表情：主角，情绪]` / `[图片：内容]`）。这是唯一会外发图片内容的路径，因此单独设开关、单次最多 `MAX_VISION_IMAGES=200` 张、总耗时 420 秒上限。**节流策略分两种**：沿用**交大网关**时（未设 `VISION_API_KEY`/`VISION_BASE_URL`）保持**每分钟 10 次的全局节流（两次请求间隔 7.5 秒）并串行**，因为限额是按 API key 计的；配了**自己的识图 API** 时（`vision.using_personal_api()`）**不节流、并行 4 张**（`parallel_workers()`），速度显著提升。单张失败最多尝试 4 次（等待 5/10/20 秒），仍失败就保留 `[表情]/[图片]`。导入提示会写明「成功 N 个 / 失败 N 个 / 未处理 N 个」。**同一张裁块按 16×16 灰度指纹做进程内缓存**（平均差 <0.012 视为同一张），聊天里反复出现的同一张表情只识别一次、不额外占额度；图片/表情的图内相邻去重被禁用（连发同一张是正常行为），接缝去重仍保留（比较 content + image）。**没识别成功的可点校对表上方的「重新识别未概述的图片/表情（N）」**——前端按 8 条一批调 `POST /api/profiles/describe`，只补这几条、逐批回填并刷新预览，不用重新导入。`/api/health` 的 `vision_available` 用于在前端未配置时禁用开关。
 
 ### 7.3 降级与失败处理
 
@@ -676,6 +683,9 @@ AI 条目标记为 `origin="ai"`、`certainty="tentative"`——**与本地提�
 | POST | `/preview` | 脱敏预览：返回真正会发出去的消息 |
 | POST | `/parse` | 上传解析出 `{speakers, messages}`，供用户确认"我 / 对方" |
 | POST | `/parse-image` | 上传一张长截图，本机 OCR 后返回带时间/类型元数据的 `{speakers, messages}`（依赖缺失时 503） |
+| POST | `/describe` | 重新识别一批表情/图片（`{items:[{id,kind,image}]}` → `{results:[{id,kind,content}\|{id,error}]}`），供「重新识别未概述」按钮补漏 |
+| POST | `/api/config/vision` | 网页里保存识图 API：写进本机 `.env`（`VISION_API_KEY/BASE_URL/MODEL`），立即生效；只回显 `vision_*` 状态，不回传密钥 |
+| POST | `/api/config/vision/test` | 用一张固定的虚构小图验证识图 API，不发真实聊天内容 |
 | POST | `/contacts/{id}/analyze` | 旧入口，内部调用同一个 `run_unified()` |
 
 ### 8.3 找钓翁聊聊（`/api/fisherman`）

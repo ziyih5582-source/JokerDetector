@@ -121,7 +121,7 @@ def test_demo_cloud_consent_still_generates_the_long_report(client, monkeypatch)
     """cloud_consent 在示例接口里同时表示「生成长文」，保持旧语义。"""
     calls = []
 
-    def fake_guidance(self, data, self_id, is_joker, joker_type, emotions=None):
+    def fake_guidance(self, records, self_id, is_joker, joker_type):
         calls.append(1)
         return "长文" * 600
 
@@ -168,14 +168,113 @@ def test_emotion_reaches_preview_but_does_not_change_score(client):
     assert preview.json()["messages"][0]["emotion"] == "开心"
 
 
-def test_ai_transcript_marks_emotion():
-    from app.services.analyzer import _build_transcript
-    text = _build_transcript([("我", "[表情]"), ("对方", "你好")], "我", ["开心", None])
-    assert "（表情情绪：开心）" in text
-    assert text.count("（表情情绪：") == 1
+def test_preview_returns_ai_json_payload(client):
+    """脱敏预览同时给出将发给云端 AI 的 JSON（所见即所发）。"""
+    preview = client.post("/api/profiles/preview", json={
+        "messages": [
+            {"speaker": "我", "content": "[表情]", "emotion": "开心", "kind": "sticker"},
+            {"speaker": "小林", "content": "在", "time": "20:13", "time_guessed": True},
+        ],
+        "self_speaker": "我", "other_speaker": "小林",
+    })
+    assert preview.status_code == 200
+    import json as _json
+    payload = _json.loads(preview.json()["ai_payload"])
+    assert payload["messages"][0] == {
+        "id": 0, "speaker": "自己", "text": "[表情]", "emotion": "开心", "kind": "sticker"}
+    assert payload["messages"][1]["speaker"] == "对方"
+    assert payload["messages"][1]["time"] == "20:13"
+    assert payload["messages"][1]["time_guessed"] is True
+    assert "kind" not in payload["messages"][1]
+
+
+def test_build_ai_payload_maps_speakers_and_limits():
+    from app.services.analyzer import build_ai_payload
+    records = [
+        {"id": 0, "speaker": "我", "text": "在吗"},
+        {"id": 1, "speaker": "对方", "text": "在", "emotion": "开心"},
+    ]
+    payload = build_ai_payload(records, self_id="我")
+    assert '"speaker": "自己"' in payload and '"speaker": "对方"' in payload
+    limited = build_ai_payload(records, self_id="我", limit=1)
+    assert '"text": "在"' in limited and '"text": "在吗"' not in limited
+
+
+def test_guidance_prompt_carries_json_payload(monkeypatch):
+    """长文 AI 收到的对话是 JSON（含情绪/时间/类型），不再是一行行文本。"""
+    from types import SimpleNamespace
+    captured = {}
+
+    def create(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(choices=[SimpleNamespace(
+            message=SimpleNamespace(content="长文"), finish_reason="stop")])
+
+    fake_client = SimpleNamespace(with_options=lambda **kwargs: SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create))))
+    monkeypatch.setattr(deps.analyzer, "client", fake_client)
+    monkeypatch.setattr(deps.analyzer, "ai_model", "fake-model")
+    text = deps.analyzer.ai_guidance(
+        [{"speaker": "自己", "text": "在吗", "emotion": "开心", "time": "20:13", "kind": "sticker"}],
+        "自己", False, None)
+    assert text == "长文"
+    prompt = captured["messages"][-1]["content"]
+    assert '"messages"' in prompt
+    assert '"text": "在吗"' in prompt and '"emotion": "开心"' in prompt and '"kind": "sticker"' in prompt
 
 
 def test_health_reports_ocr_availability(client):
     """前端据此在未安装 OCR 依赖时置灰「导入长截图」入口。"""
     data = client.get("/api/health").json()
     assert isinstance(data["ocr_available"], bool)
+    assert isinstance(data["vision_available"], bool)
+
+
+def test_vision_config_can_be_saved_from_the_page(client, tmp_path, monkeypatch):
+    """网页里保存识图 API：写进 .env、保留其它行、立即生效、绝不回传密钥。"""
+    from app.core import config
+    env_file = tmp_path / ".env"
+    env_file.write_text("DEEPSEEK_API_KEY=sk-main\n", encoding="utf-8")
+    monkeypatch.setattr(config, "ENV_FILE", env_file)
+    for key in ("VISION_API_KEY", "VISION_BASE_URL", "VISION_MODEL", "DEEPSEEK_VISION_MODEL"):
+        monkeypatch.delenv(key, raising=False)
+    response = client.post("/api/config/vision", json={
+        "model": "qwen-vl-max", "base_url": "https://example.com/v1", "api_key": "sk-test-123"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["vision_model"] == "qwen-vl-max"
+    assert body["vision_key_set"] is True
+    text = env_file.read_text(encoding="utf-8")
+    assert "DEEPSEEK_API_KEY=sk-main" in text          # 其它行保留
+    assert "VISION_MODEL=qwen-vl-max" in text
+    assert "VISION_API_KEY=sk-test-123" in text
+    assert config.vision_model() == "qwen-vl-max"
+    assert config.vision_base_url() == "https://example.com/v1"
+    assert config.vision_api_key() == "sk-test-123"
+    assert "sk-test-123" not in response.text          # 密钥不回传
+
+
+def test_vision_config_rejects_bad_base_url(client):
+    response = client.post("/api/config/vision", json={"base_url": "ftp://example.com"})
+    assert response.status_code == 400
+
+
+def test_vision_test_endpoint_uses_fixed_image(client, monkeypatch):
+    from app.core import config
+    from app.services import vision
+    monkeypatch.setattr(config, "vision_model", lambda: "qwen-vl-max")
+    monkeypatch.setattr(vision, "available", lambda: True)
+    monkeypatch.setattr(vision, "interpret_data_url",
+                        lambda url, hint_kind="sticker", **kwargs: {"kind": "sticker",
+                                                                    "character": "笑脸", "summary": "黄色笑脸"})
+    data = client.post("/api/config/vision/test").json()
+    assert data["success"] is True
+    assert data["model"] == "qwen-vl-max"
+    assert data["summary"] == "黄色笑脸"
+
+
+def test_vision_test_endpoint_without_model(client, monkeypatch):
+    from app.core import config
+    monkeypatch.setattr(config, "vision_model", lambda: "")
+    data = client.post("/api/config/vision/test").json()
+    assert data["success"] is False

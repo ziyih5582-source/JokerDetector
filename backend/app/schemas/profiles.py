@@ -20,6 +20,9 @@ class Message(StrictModel):
     speaker: str = Field(min_length=1, max_length=100)
     content: str = Field(min_length=1, max_length=5000)
     emotion: str | None = Field(default=None, max_length=32)
+    time: str | None = Field(default=None, max_length=32)
+    time_guessed: bool = False
+    kind: str | None = Field(default=None, max_length=16)
 
 
 class AnalyzeInput(StrictModel):
@@ -61,3 +64,15 @@ class JokerDetectInput(StrictModel):
     messages: list[Message] = Field(min_length=2, max_length=config.MAX_ROWS)
     self_speaker: str = Field(min_length=1, max_length=100)
     other_speaker: str = Field(min_length=1, max_length=100)
+
+
+class DescribeItem(StrictModel):
+    """重新识别单张表情/图片：id 由前端给，用于回填。"""
+
+    id: str = Field(min_length=1, max_length=64)
+    kind: str | None = Field(default=None, max_length=16)
+    image: str = Field(min_length=1, max_length=400_000)
+
+
+class DescribeInput(StrictModel):
+    items: list[DescribeItem] = Field(min_length=1, max_length=30)

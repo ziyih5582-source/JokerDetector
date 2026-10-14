@@ -182,6 +182,12 @@
               <p class="note">只有勾选云端 AI 时，下面这些片段才会发出去；档案只留脱敏引用。自动脱敏认不出所有隐私，请自行删去不愿处理的内容。</p>
               <pre id="redacted-preview"></pre>
             </details>
+            <div class="line-actions">
+              <button type="button" id="toggle-json" class="line-btn quiet">查看 JSON</button>
+              <button type="button" id="export-json" class="line-btn quiet">导出 JSON</button>
+              <span class="note">导出/查看的是将发给云端分析 AI 的脱敏片段</span>
+            </div>
+            <pre id="redacted-json" hidden></pre>
           </div>
 
           <label class="field-label" for="chat-text">聊天记录</label>
@@ -202,9 +208,15 @@
             <span id="message-count" class="note"></span>
           </div>
 
+          <label class="check" id="describe-row"><input type="checkbox" id="describe-images" checked><span id="describe-text">长截图里的表情/图片，用云端视觉模型写一句内容描述（会把这些裁块发给云端 AI；可取消）</span></label>
+
           <div id="ocr-review" hidden>
             <p class="note" id="ocr-note"></p>
             <div id="ocr-avatars" class="ocr-avatars" hidden></div>
+            <div class="line-actions">
+              <button type="button" id="ocr-retry-vision" class="line-btn quiet" hidden>重新识别未概述的图片/表情</button>
+              <span id="ocr-vision-count" class="note"></span>
+            </div>
             <div id="ocr-table" class="ocr-table"></div>
           </div>
 
@@ -262,6 +274,8 @@
             <button type="button" id="joker-clear-chat" class="line-btn quiet">清空</button>
             <span id="joker-message-count" class="note"></span>
           </div>
+
+          <label class="check" id="joker-describe-row"><input type="checkbox" id="joker-describe-images" checked><span id="joker-describe-text">长截图里的表情/图片，用云端视觉模型写一句内容描述（会把这些裁块发给云端 AI；可取消）</span></label>
 
           <div id="joker-speaker-panel" hidden>
             <div class="two-up">
@@ -609,7 +623,7 @@
         </div>
         <div class="panel">
           <h4>谈心分析</h4>
-          <p>唯一的输入口。粘贴文本、导入 Excel，或导入微信长截图（可多选，本机 OCR：先按选择顺序拼成校对表并去掉接缝重复；顶部状态栏与底部输入栏会自动排除，标题栏昵称会作为「对方」的名字；文字默认折叠、点开才改，图片与表情常展开、可直接选情绪并点缩略图看原图）。时间与头像只作展示；表情情绪会随脱敏片段一起发给云端 AI，改情绪时脱敏预览会立即更新，但本地评分不看它。辨认说话的人、核对脱敏预览、决定这次是否写进档案、是否调用云端 AI。示例按钮可以先用虚构内容跑一遍。</p>
+          <p>唯一的输入口。粘贴文本、导入 Excel，或导入微信长截图（可多选，本机 OCR：先按选择顺序拼成校对表并去掉接缝重复；顶部状态栏与底部输入栏会自动排除，标题栏昵称会作为「对方」的名字；文字默认折叠、点开才改，图片与表情常展开、可直接选情绪并点缩略图看原图）。导入长截图时还可以让云端视觉模型给表情/图片写一句描述——表情偏概括情绪、图片偏描述内容（默认开启、可取消；需要配置 DEEPSEEK_VISION_MODEL）。时间与头像只作展示；表情情绪与图片描述会随脱敏片段一起发给云端 AI，改情绪时脱敏预览会立即更新，但本地评分不看它们。核对脱敏预览时还能「查看 JSON / 导出 JSON」：导出的是将发给分析 AI 的结构化片段（id / 说话人 / 文本 / 时间 / 消息类型 / 情绪）。示例按钮可以先用虚构内容跑一遍。</p>
         </div>
         <div class="panel">
           <h4>分析结果</h4>
@@ -629,7 +643,7 @@
         </div>
         <div class="panel">
           <h4>设置</h4>
-          <p>查看云端 AI 是否就绪（密钥放在服务端项目根目录 <code>.env</code> 的 <code>DEEPSEEK_API_KEY</code> 里，页面只显示状态），以及湖面动画、撒食与背景音乐。</p>
+          <p>查看云端 AI 是否就绪（密钥放在服务端项目根目录 <code>.env</code> 的 <code>DEEPSEEK_API_KEY</code> 里，页面只显示状态）。这里还能改「识图 API」：填写自己的模型名 / 接口地址 / Key 并保存（写进本机 <code>.env</code>、立即生效），用「验证调用」测试；以及湖面动画、撒食与背景音乐。</p>
         </div>
         <div class="panel">
           <h4>小丑鉴定所</h4>
@@ -696,6 +710,7 @@
       <h3 class="block-title"><span>云</span>云端 AI 状态</h3>
       <div class="form-narrow">
         <p class="note" id="ai-config-state">正在读取配置…</p>
+        <p class="note" id="vision-config-state">正在读取表情/图片识别配置…</p>
         <div class="line-actions">
           <button type="button" id="ai-test-btn" class="line-btn">测试连接</button>
           <button type="button" id="ai-reload-btn" class="line-btn quiet">重新加载配置</button>
@@ -704,9 +719,26 @@
         <p class="note">验证会向已配置的服务发送一段固定的虚构示例，会产生少量用量，不会发送你的聊天。配置来自项目根目录 <code>.env</code> 里的 <code>DEEPSEEK_API_KEY</code>（也支持同名环境变量）；改完 <code>.env</code> 后点「重新加载配置」即可生效。密钥只留在服务端，不会下发到浏览器。</p>
       </div>
 
+      <h3 class="block-title"><span>眼</span>识图 API（表情/图片识别）</h3>
+      <div class="form-narrow">
+        <label class="field-label" for="vision-model">模型名</label>
+        <input id="vision-model" placeholder="如 qwen-vl-max / glm-4v / qwen3.8-27b" maxlength="128" autocomplete="off">
+        <label class="field-label" for="vision-base">接口地址（OpenAI 兼容）</label>
+        <input id="vision-base" placeholder="留空沿用主服务商；如 https://dashscope.aliyuncs.com/compatible-mode/v1" maxlength="300" autocomplete="off">
+        <label class="field-label" for="vision-key">API Key</label>
+        <input id="vision-key" type="password" placeholder="留空表示不修改；点「清除」可回落主 Key" maxlength="300" autocomplete="new-password">
+        <div class="line-actions">
+          <button type="button" id="vision-save" class="line-btn">保存</button>
+          <button type="button" id="vision-test" class="line-btn quiet">验证调用</button>
+          <button type="button" id="vision-clear" class="line-btn quiet">清除（回落主服务商）</button>
+          <span class="note" id="vision-msg"></span>
+        </div>
+        <p class="note">保存会写进本机 <code>.env</code>（已 gitignore）并立即生效；<b>密钥只进不出</b>，不回显、不下发浏览器。只支持 OpenAI 兼容且支持图片输入的模型（OpenAI 的 <code>gpt-4o-mini</code>、<code>deepseek-flash</code>、<code>qwen-vl-max</code>、<code>glm-4v</code> 等）。这些模型都只是「看图」，<b>没有联网搜索</b>。用自己的 API 时识别<b>不节流、并行 4 张</b>，比共享网关快很多。</p>
+      </div>
+
       <h3 class="block-title"><span>湖</span>湖面与动画</h3>
       <div class="line-actions">
-        <button type="button" id="pond-toggle" class="line-btn quiet">暂停湖面动画</button>
+        <button type="button" id="pond-toggle" class="line-btn quiet">继续湖面动画</button>
         <button type="button" id="pond-scatter" class="line-btn quiet">撒一把鱼食</button>
       </div>
       <p class="note">首页之外的水面上都养着鱼：点任意空白处置食，附近的鱼会游过来吃掉。</p>

@@ -119,7 +119,9 @@ def run_unified(
     # 情感分析：本地统计始终执行；云端长文只在需要时额外调用一次。
     result = analyzer.analyze_demo(
         [{"speaker": "自己" if m["role"] == "self" else "对方",
-          "content": m["content"], "emotion": m.get("emotion")} for m in prepared],
+          "content": m["content"], "emotion": m.get("emotion"),
+          "time": m.get("time"), "time_guessed": m.get("time_guessed"),
+          "kind": m.get("kind")} for m in prepared],
         "自己",
         "对方",
         allow_ai=False,
