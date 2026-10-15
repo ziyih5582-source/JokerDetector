@@ -155,5 +155,39 @@ def is_placeholder_key(key: str) -> bool:
     return not key or key.startswith(PLACEHOLDER_KEY_PREFIXES)
 
 
+# ================== 监听地址与局域网共享 ==================
+# 默认只监听回环地址（仅本机可访问）。要共享给同一局域网/热点里的同学，
+# 用启动脚本的「局域网模式」（start-lan.bat / scripts/start_lan.py）把
+# JOKER_HOST 设为 0.0.0.0，并在 JOKER_ALLOWED_HOSTS 里补上本机局域网 IP
+# （或填 * 放开 Host 校验）。
+DEFAULT_HOST = "127.0.0.1"
+DEFAULT_PORT = 8000
+
+
+def host() -> str:
+    return os.getenv("JOKER_HOST", DEFAULT_HOST).strip() or DEFAULT_HOST
+
+
+def port() -> int:
+    raw = os.getenv("JOKER_PORT", str(DEFAULT_PORT)).strip()
+    try:
+        return int(raw)
+    except ValueError:
+        return DEFAULT_PORT
+
+
+def allowed_hosts() -> list[str]:
+    """TrustedHost 白名单：始终允许本机；局域网模式下再追加 JOKER_ALLOWED_HOSTS。"""
+    base = ["localhost", "127.0.0.1", "[::1]", "testserver"]
+    extra = os.getenv("JOKER_ALLOWED_HOSTS", "").strip()
+    if not extra:
+        return base
+    for item in extra.split(","):
+        item = item.strip()
+        if item and item not in base:
+            base.append(item)
+    return base
+
+
 # 进程启动时先加载一次，保证 ImportError 之前配置就已就位
 load_env_file()

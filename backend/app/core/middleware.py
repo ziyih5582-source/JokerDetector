@@ -13,7 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]", "testserver"]
+from app.core import config
 
 # 前端不使用任何外部脚本、字体与内联脚本，所以可以直接上最严的 CSP
 CONTENT_SECURITY_POLICY = (
@@ -22,13 +22,14 @@ CONTENT_SECURITY_POLICY = (
     "form-action 'self'"
 )
 
-PAGE_PATHS = {"/", "/profiles", "/index.html"}
+PAGE_PATHS = {"/", "/profiles", "/index.html", "/community", "/joker"}
 
 CROSS_SITE_WRITE_MESSAGE = "不接受跨站修改请求"
 
 
 def install_middleware(app: FastAPI) -> None:
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
+    # 默认只信任本机 Host；局域网模式由 JOKER_ALLOWED_HOSTS 追加同学要用的地址。
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=config.allowed_hosts())
 
     @app.middleware("http")
     async def local_privacy(request: Request, call_next):
