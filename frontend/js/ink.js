@@ -2102,6 +2102,16 @@ bindMetricTooltip(label, metricKey, metric);
       is_joker: result.is_joker
     };
 
+    // 右上角小丑看板：先按本次结果即时更新，再由它自己去补齐六维依据原句
+    if (window.ClownBoard && typeof window.ClownBoard.publish === 'function') {
+      window.ClownBoard.publish(result, {
+        source: '小丑鉴定所',
+        messages: state.jokerMessages,
+        self: $('joker-self-speaker').value,
+        other: $('joker-other-speaker').value
+      });
+    }
+
     var box = $('joker-signs');
     box.replaceChildren();
     var order = ['one_way', 'self_moved', 'fantasy', 'boundary', 'no_accept_reject', 'self_mockery'];

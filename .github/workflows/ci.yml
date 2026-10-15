@@ -17,8 +17,11 @@ jobs:
         run: |
           node --check frontend/js/speech.js
           node --check frontend/js/ink.js
+          node --check frontend/js/clown-board.js
       - name: 朗读状态与长文测试
         run: node --test frontend/tests/speech.test.cjs
+      - name: 小丑看板纯逻辑测试
+        run: node --test frontend/tests/clown-board.test.cjs
 
   backend:
     name: 后端测试
