@@ -3,7 +3,7 @@
 
 from fastapi import APIRouter
 
-from app.api.routes import analysis, fisherman, profiles, system, campus_preview
+from app.api.routes import analysis, fisherman, profiles, system, campus_preview, community
 
 api_router = APIRouter()
 api_router.include_router(system.router)
@@ -11,5 +11,6 @@ api_router.include_router(analysis.router)
 api_router.include_router(profiles.router)
 api_router.include_router(fisherman.router)
 api_router.include_router(campus_preview.router)
+api_router.include_router(community.router)
 
 __all__ = ["api_router"]

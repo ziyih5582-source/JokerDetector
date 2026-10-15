@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -7,8 +7,9 @@
 <meta name="description" content="交心 · 思源湖研究所：把一段聊天交给思源湖，算法量投入，AI 读语气，湖畔的钓翁陪你把它想明白。上海交通大学工程学导论课程项目。">
 <meta name="theme-color" content="#f4f0e6">
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-<link rel="stylesheet" href="/static/css/ink.css?v=archive-focus-6.2">
+<link rel="stylesheet" href="/static/css/ink.css?v=community-1.7">
 <link rel="stylesheet" href="/static/css/dossier.css?v=archive-focus-6.2">
+<link rel="stylesheet" href="/static/css/community.css?v=community-1.7">
 </head>
 <body data-view="pond">
 
@@ -44,6 +45,8 @@
       <button type="button" data-go="config" title="云端 AI 状态、湖面动画与背景音乐">设置</button>
       <i aria-hidden="true"></i>
       <button type="button" data-go="joker" class="nav-joker" title="小丑鉴定所：用六征量一量自己">小丑鉴定所<span class="nav-ping" aria-hidden="true"></span></button>
+      <i aria-hidden="true"></i>
+      <button type="button" data-go="community" title="查看小丑王榜单">小丑社区</button>
     </nav>
 
   </header>
@@ -295,9 +298,84 @@
           </ul>
           <p class="note">单向 + 至少另一项，且综合分过线才会判定；只是认真喜欢一个人，不会被误伤。</p>
           <button type="button" id="joker-run-btn" class="seal-btn wide joker-run">开 鉴</button>
+          <button type="button" id="joker-goto-community" class="line-btn wide joker-goto-community">🏆 查看小丑社区榜单</button>
         </aside>
       </div>
     </section>
+
+    <!-- ==================================================================
+         小丑社区 · 排行榜与评论
+         ================================================================== -->
+    <section class="view" data-view="community">
+      <div class="clown-parade" id="clown-parade" aria-hidden="true"></div>
+      <div class="community-head">
+        <h2>🏆 小丑王榜单</h2>
+        <div class="community-account" id="community-account">
+          <span id="community-user" class="community-user">未登录</span>
+          <button type="button" id="btn-auth" class="line-btn quiet">登录 / 注册</button>
+        </div>
+      </div>
+
+      <div id="leaderboard-list" class="leaderboard-list">
+        <p class="loading-note">加载中...</p>
+      </div>
+
+      <div id="pagination" class="pagination" hidden>
+        <button id="prev-page" class="line-btn quiet">上一页</button>
+        <span id="page-info"></span>
+        <button id="next-page" class="line-btn quiet">下一页</button>
+      </div>
+
+      <button id="btn-go-joker" class="seal-btn wide">去小丑鉴定所开鉴</button>
+    </section>
+
+    <!-- 评论模态框 -->
+    <div id="comments-modal" class="modal" hidden>
+      <div class="modal-content">
+        <span class="close" id="close-comments">&times;</span>
+        <h3 id="modal-entry-title"></h3>
+        <div id="comments-list" class="comments-list"></div>
+        <div class="comment-form">
+          <textarea id="comment-input" rows="3" placeholder="写下你的评论（50 字以内）" maxlength="50"></textarea>
+          <button id="btn-post-comment" class="seal-btn">发布评论</button>
+          <p class="note" id="comment-hint"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 提交评分模态框（从鉴定结果进入） -->
+    <div id="submit-modal" class="modal" hidden>
+      <div class="modal-content">
+        <span class="close" id="close-submit">&times;</span>
+        <h3>把这次鉴定结果送上榜单</h3>
+        <div class="result-preview" id="submit-preview"></div>
+        <p class="note">将以 <b id="submit-who">你的账号</b> 的名义上榜。</p>
+        <button id="btn-confirm-submit" class="seal-btn wide">确认提交</button>
+      </div>
+    </div>
+
+    <!-- 登录 / 注册模态框 -->
+    <div id="auth-modal" class="modal" hidden>
+      <div class="modal-content">
+        <span class="close" id="close-auth">&times;</span>
+        <h3 id="auth-title">登录</h3>
+        <div class="form-group">
+          <label for="auth-username">用户名：</label>
+          <input type="text" id="auth-username" placeholder="2–20 个字符" maxlength="20" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="auth-password">密码（6 位数字）：</label>
+          <input type="password" id="auth-password" placeholder="6 位数字" maxlength="6" inputmode="numeric" autocomplete="current-password">
+        </div>
+        <div class="form-group" id="avatar-picker-group" hidden>
+          <label>选一个头像（小丑形象）：</label>
+          <div class="avatar-picker" id="avatar-picker"></div>
+        </div>
+        <p class="auth-error" id="auth-error" hidden></p>
+        <button id="btn-auth-submit" class="seal-btn wide">登录</button>
+        <p class="auth-switch">还没有账号？<a href="#" id="link-auth-switch">去注册</a></p>
+      </div>
+    </div>
 
     <!-- ==================================================================
          分析结果 · 水纹与档案变动
@@ -818,10 +896,15 @@
     <h2 id="joker-dialog-title">确诊</h2>
     <div class="seal-type joker-dialog-seal"><span id="joker-dialog-seal-text"></span></div>
   </div>
+  <div class="joker-dialog-score">
+    <span class="score-number" id="joker-dialog-score">0</span>
+    <span class="score-unit">小丑值 / 100</span>
+  </div>
   <p class="big-quote" id="joker-dialog-desc"></p>
   <p class="note" id="joker-dialog-suggestion"></p>
   <div class="joker-signs" id="joker-signs"></div>
   <div class="line-actions">
+    <button type="button" id="joker-submit" class="line-btn">🏆 把这次结果送上榜单</button>
     <button type="button" id="joker-again" class="line-btn quiet">再看一遍头像</button>
     <button type="button" id="joker-close" class="seal-btn">我知道了，先爱自己</button>
   </div>
@@ -829,9 +912,13 @@
 
 <script src="/static/js/theory.js"></script>
 <script src="/static/js/pond.js"></script>
-<script src="/static/js/clown.js"></script>
+<script src="/static/js/clown.js?v=community-1.7"></script>
 <script src="/static/js/speech.js"></script>
 <script src="/static/js/dossier.js?v=archive-focus-6.2"></script>
-<script src="/static/js/ink.js?v=archive-focus-6.2"></script>
+<script src="/static/js/ink.js?v=community-1.7"></script>
+<script src="/static/js/community.js?v=community-1.7"></script>
+
+
 </body>
 </html>
+

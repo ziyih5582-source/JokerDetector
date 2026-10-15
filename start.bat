@@ -1,0 +1,38 @@
+@echo off
+rem ============================================================
+rem  Joker Detector Pro - quick start
+rem  Serves backend + frontend on http://127.0.0.1:8000
+rem ============================================================
+setlocal
+
+rem UTF-8 console + UTF-8 Python stdio, so the Chinese banner shows correctly
+chcp 65001 >nul
+set "PYTHONUTF8=1"
+
+cd /d "%~dp0"
+
+set "PYEXE="
+if exist ".venv\Scripts\python.exe" set "PYEXE=.venv\Scripts\python.exe"
+if not defined PYEXE (
+  where python >nul 2>&1
+  if %errorlevel%==0 set "PYEXE=python"
+)
+
+if not defined PYEXE (
+  echo [ERROR] Python not found. Install Python 3.10+ and retry.
+  pause
+  exit /b 1
+)
+
+echo Using interpreter: %PYEXE%
+echo.
+echo Open http://127.0.0.1:8000/ in your browser.
+echo Press Ctrl+C to stop.
+echo.
+
+set "PYTHONPATH=%~dp0backend"
+cd backend
+"%PYEXE%" -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+cd ..
+
+pause

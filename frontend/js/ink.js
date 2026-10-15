@@ -171,7 +171,9 @@
     book: '人物档案',
     theory: '心理学依据',
     guide: '使用说明',
-    config: '设置'
+    config: '设置',
+    joker: '小丑鉴定所',
+    community: '小丑社区'
   };
 
   function setHere(view) {
@@ -185,8 +187,23 @@
     setHere(view);
     if (view === 'theory') renderTheory();
     if (view === 'guide') renderGuide();
+    if (view === 'community') {
+      if (typeof window.CommunityInit === 'function') {
+        window.CommunityInit();
+      }
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+
+  // 切换到社区页面（从外部调用）
+  window.switchToCommunity = function() {
+    go('community');
+  };
+
+  // 切换到小丑鉴定所（从外部调用）
+  window.switchToJoker = function() {
+    go('joker');
+  };
 
   // ------------------------------------------------------------ 湖面交互
 
@@ -1621,6 +1638,12 @@ bindMetricTooltip(label, metricKey, metric);
       var dialog = $('joker-dialog');
       window.Clown.start(dialog.dataset.level || 'suspicious', dialog.dataset.type || null);
     });
+    $('joker-submit').addEventListener('click', function () {
+      openSubmitFromJoker();
+    });
+    $('joker-goto-community').addEventListener('click', function () {
+      window.switchToCommunity();
+    });
   }
 
   function jokerClearChat() {
@@ -1850,16 +1873,25 @@ bindMetricTooltip(label, metricKey, metric);
     var dialog = $('joker-dialog');
     dialog.dataset.level = result.level;
     dialog.dataset.type = result.type || '';
+    dialog.dataset.score = result.score;
     $('joker-dialog-title').textContent = result.is_joker
       ? '确诊：' + result.type
       : '清醒玩家';
     $('joker-dialog-seal-text').textContent = result.is_joker ? result.type.replace('型', '') : '清醒';
+    $('joker-dialog-score').textContent = (result.score != null) ? Number(result.score).toFixed(1) : '0';
     $('joker-dialog-desc').textContent = result.is_joker && result.type_info
       ? result.type_info.desc
       : '这段聊天里双方投入大致对等，没有出现明显的小丑状态。认真喜欢一个人不丢人，继续保持清醒。';
     $('joker-dialog-suggestion').textContent = result.is_joker && result.type_info
       ? '建议 · ' + result.type_info.suggestion
       : '';
+
+    // 记录本次结果，供「送上榜单」使用
+    state.jokerResult = {
+      score: result.score,
+      type: result.type || '',
+      is_joker: result.is_joker
+    };
 
     var box = $('joker-signs');
     box.replaceChildren();
@@ -1886,6 +1918,32 @@ bindMetricTooltip(label, metricKey, metric);
       window.Clown.start(result.level, result.type);
     }
     dialog.showModal();
+  }
+
+  // 从鉴定结果弹窗打开「送上榜单」
+  function openSubmitFromJoker() {
+    var result = state.jokerResult;
+    if (!result) return;
+    // 关闭鉴定弹窗，避免层叠
+    $('joker-dialog').close();
+    window.Clown.stop();
+
+    // 类型可能为空（清醒玩家），给一个兜底标签
+    var payload = {
+      score: result.score,
+      type: result.type || '清醒型',
+      is_joker: result.is_joker
+    };
+
+    // 交给社区模块处理提交（它会记录 pendingResult、按登录状态决定是否先登录）
+    if (typeof window.CommunityOpenSubmit === 'function') {
+      window.CommunityOpenSubmit(payload);
+      return;
+    }
+
+    // 兜底：社区模块未加载时，直接跳到社区页
+    say('社区模块未加载，已为你切到小丑社区。', true);
+    window.switchToCommunity();
   }
 
   // ------------------------------------------------------------ 配乐

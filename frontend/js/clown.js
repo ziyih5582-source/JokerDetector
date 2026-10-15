@@ -266,11 +266,71 @@
     }
   }
 
+  // ------------------------------------------------------------ 榜单装饰：会捏鼻子的小丑队列
+  // 纯 SVG + CSS 动画：每个小丑轻轻摇摆，并周期性地抬手捏一下自己的红鼻子。
+  // 动画定义在 community.css 里（.clown-parade / .parade-clown / clown-pinch）。
+  var PARADE_COLORS = [
+    { hat: '#cf3b2a', body: '#3a6ea5' },
+    { hat: '#3a6ea5', body: '#cf3b2a' },
+    { hat: '#d4a853', body: '#8b6faf' },
+    { hat: '#8b6faf', body: '#d4a853' },
+    { hat: '#5aa06a', body: '#c46868' }
+  ];
+
+  function paradeClown(palette) {
+    var c = palette.hat;
+    var b = palette.body;
+    return '<svg viewBox="0 0 100 122" preserveAspectRatio="xMidYMid meet" role="img" aria-label="捏鼻子的小丑">'
+      + '<ellipse cx="50" cy="116" rx="26" ry="5" fill="rgba(35,33,32,.12)"/>'
+      // 身体（从下巴下方接住，避免露缝）
+      + '<path d="M33 82 q17 -8 34 0 q10 18 8 34 h-50 q-2 -16 8 -34 Z" fill="' + b + '"/>'
+      // 领口荷叶边
+      + '<path d="M31 84 q19 13 38 0" fill="none" stroke="#e2c04a" stroke-width="6" stroke-linecap="round"/>'
+      // 头（头顶在 y=30）
+      + '<circle cx="50" cy="56" r="26" fill="#fffdf8" stroke="#232120" stroke-width="2"/>'
+      // 尖顶帽：帽尖在上，帽檐压在头顶
+      + '<path d="M50 6 L33 32 L67 32 Z" fill="' + c + '"/>'
+      + '<rect x="29" y="29" width="42" height="7" rx="3.5" fill="#b03028"/>'
+      + '<circle cx="50" cy="6" r="5" fill="#e2c04a"/>'
+      // 眼睛
+      + '<circle cx="41" cy="54" r="3.4" fill="#232120"/><circle cx="42" cy="53" r="1.1" fill="#fff"/>'
+      + '<circle cx="59" cy="54" r="3.4" fill="#232120"/><circle cx="60" cy="53" r="1.1" fill="#fff"/>'
+      // 腮红
+      + '<ellipse cx="34" cy="65" rx="5" ry="3.2" fill="rgba(214,106,82,.35)"/>'
+      + '<ellipse cx="66" cy="65" rx="5" ry="3.2" fill="rgba(214,106,82,.35)"/>'
+      // 嘴
+      + '<path d="M40 69 Q50 79 60 69" fill="none" stroke="#b03028" stroke-width="2.6" stroke-linecap="round"/>'
+      // 红鼻子（会被捏）
+      + '<circle class="clown-nose" cx="50" cy="61" r="7.5" fill="#cf3b2a"/>'
+      + '<circle cx="47.6" cy="58.6" r="2.3" fill="#ff9a80"/>'
+      // 会抬起来捏鼻子的手（画在最上层，平时垂在身侧，周期性抬到鼻前）
+      + '<g class="clown-hand">'
+      +   '<path d="M66 94 q4 2 6 4" fill="none" stroke="' + b + '" stroke-width="5" stroke-linecap="round"/>'
+      +   '<circle cx="73" cy="99" r="7.5" fill="#fffdf8" stroke="#232120" stroke-width="1.8"/>'
+      +   '<circle cx="77" cy="95" r="2.8" fill="#fffdf8" stroke="#232120" stroke-width="1.4"/>'
+      + '</g>'
+      + '</svg>';
+  }
+
+  function paradeMarkup(count) {
+    var n = Math.max(1, Math.min(count || 5, PARADE_COLORS.length));
+    var html = '<div class="clown-parade-inner">';
+    for (var i = 0; i < n; i++) {
+      var delay = (i * 0.42).toFixed(2) + 's';
+      html += '<div class="parade-clown" style="--d:' + delay + '">'
+        + paradeClown(PARADE_COLORS[i % PARADE_COLORS.length])
+        + '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
   window.Clown = {
     start: start,
     stop: stop,
     bust: bustMarkup,
     circus: circusMarkup,
+    parade: paradeMarkup,
     isRunning: function () { return state.running; }
   };
 })();

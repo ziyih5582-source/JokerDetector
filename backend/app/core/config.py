@@ -48,6 +48,7 @@ MAX_IMAGE_MB = 20
 MAX_IMAGE_BYTES = MAX_IMAGE_MB * 1024 * 1024
 MAX_IMAGE_PIXELS = 80_000_000
 MAX_IMAGES = 20  # 单次最多同时导入的截图张数
+MAX_VISION_IMAGES = 200  # 单次最多用视觉模型识别多少张表情/图片
 FACTS_PER_CONTACT = 500
 BATCHES_PER_CONTACT = 200
 EVIDENCE_PER_FACT = 10
@@ -99,6 +100,54 @@ def base_url() -> str:
 
 def model_name() -> str:
     return os.getenv("DEEPSEEK_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
+
+
+def vision_model() -> str:
+    """表情/图片识别用的多模态模型：优先 VISION_MODEL，其次旧的 DEEPSEEK_VISION_MODEL；留空表示不做识别。"""
+    return os.getenv("VISION_MODEL", "").strip() or os.getenv("DEEPSEEK_VISION_MODEL", "").strip()
+
+
+def vision_api_key() -> str:
+    """视觉识别的 Key：可用 VISION_API_KEY 单独配一个多模态服务商，不配就沿用主 Key。"""
+    return os.getenv("VISION_API_KEY", "").strip() or api_key()
+
+
+def vision_base_url() -> str:
+    """视觉识别的地址：可用 VISION_BASE_URL 指向别的 OpenAI 兼容服务，不配就沿用主地址。"""
+    return os.getenv("VISION_BASE_URL", "").strip() or base_url()
+
+
+def save_vision_config(*, api_key: str | None = None, base_url: str | None = None, model: str | None = None) -> None:
+    """把识图 API 配置写进项目根目录的 .env，只改这几个键、保留其它行。
+
+    传 None 表示该项不动，传空字符串表示清空（清空后回落到主服务商配置）。
+    写完立即以 refresh=True 重读，无需重启。
+    """
+    updates: dict[str, str] = {}
+    if api_key is not None:
+        updates["VISION_API_KEY"] = api_key.strip()
+    if base_url is not None:
+        updates["VISION_BASE_URL"] = base_url.strip()
+    if model is not None:
+        updates["VISION_MODEL"] = model.strip()
+    if not updates:
+        return
+    lines = ENV_FILE.read_text(encoding="utf-8").splitlines() if ENV_FILE.exists() else []
+    seen: set[str] = set()
+    output: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        key = stripped.split("=", 1)[0].strip() if ("=" in stripped and not stripped.startswith("#")) else None
+        if key in updates:
+            output.append(f"{key}={updates[key]}")
+            seen.add(key)
+        else:
+            output.append(line)
+    for key, value in updates.items():
+        if key not in seen:
+            output.append(f"{key}={value}")
+    ENV_FILE.write_text("\n".join(output) + "\n", encoding="utf-8")
+    load_env_file(refresh=True)
 
 
 def is_placeholder_key(key: str) -> bool:

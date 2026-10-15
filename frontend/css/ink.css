@@ -1,10 +1,6 @@
 /* ==========================================================================
-   交心 · 思源湖研究所 — 水墨样式
-   设计约束（来自需求）：
-   - 不使用纯色区块，不使用边框方框；板块之间只用细墨线与浓淡墨色 + 文字区分。
-   - 纸张底色、墨色文字，唯一的高饱和色是极少量的朱砂（印章 / 警示）。
-   - 湖色只作为极淡的远景存在：首页是思源湖水彩卷首，其余页面是水色薄雾 + 游鱼。
-   ========================================================================== */
+   浜ゅ績 路 鎬濇簮婀栫爺绌舵墍 鈥?姘村ⅷ鏍峰紡
+   璁捐绾︽潫锛堟潵鑷渶姹傦級锛?   - 涓嶄娇鐢ㄧ函鑹插尯鍧楋紝涓嶄娇鐢ㄨ竟妗嗘柟妗嗭紱鏉垮潡涔嬮棿鍙敤缁嗗ⅷ绾夸笌娴撴贰澧ㄨ壊 + 鏂囧瓧鍖哄垎銆?   - 绾稿紶搴曡壊銆佸ⅷ鑹叉枃瀛楋紝鍞竴鐨勯珮楗卞拰鑹叉槸鏋佸皯閲忕殑鏈辩爞锛堝嵃绔?/ 璀︾ず锛夈€?   - 婀栬壊鍙綔涓烘瀬娣＄殑杩滄櫙瀛樺湪锛氶椤垫槸鎬濇簮婀栨按褰╁嵎棣栵紝鍏朵綑椤甸潰鏄按鑹茶杽闆?+ 娓搁奔銆?   ========================================================================== */
 
 :root {
   --paper:        #f4f0e6;
@@ -17,7 +13,7 @@
   --hairline-2:   rgba(35, 33, 32, .08);
   --vermilion:    #a63c30;
   --vermilion-soft: rgba(166, 60, 48, .72);
-  --lake-tint:    #7d94a0;      /* 思源湖的水色，只用在极淡的底子上 */
+  --lake-tint:    #7d94a0;      /* 鎬濇簮婀栫殑姘磋壊锛屽彧鐢ㄥ湪鏋佹贰鐨勫簳瀛愪笂 */
   --serif: "Songti SC", "STSong", "Source Han Serif SC", "Noto Serif SC", "SimSun", serif;
   --kai:   "Kaiti SC", "STKaiti", "KaiTi", "Songti SC", serif;
   --measure: 1180px;
@@ -41,9 +37,9 @@ body {
   overflow-x: hidden;
 }
 
-/* ---------------------------------------------------------------- 底层：远景水色 + 近景游鱼 */
+/* ---------------------------------------------------------------- 搴曞眰锛氳繙鏅按鑹?+ 杩戞櫙娓搁奔 */
 
-/* 思源湖水彩的极淡一层，整站都压在纸下面，像隔着雾气看湖 */
+/* 鎬濇簮婀栨按褰╃殑鏋佹贰涓€灞傦紝鏁寸珯閮藉帇鍦ㄧ焊涓嬮潰锛屽儚闅旂潃闆炬皵鐪嬫箹 */
 .lake {
   position: fixed;
   inset: 0;
@@ -62,7 +58,7 @@ body {
   height: 100%;
   z-index: 0;
   display: block;
-  /* 首页放的是思源湖画卷，鱼留到别的页面再游出来 */
+  /* 棣栭〉鏀剧殑鏄€濇簮婀栫敾鍗凤紝楸肩暀鍒板埆鐨勯〉闈㈠啀娓稿嚭鏉?*/
   opacity: 0;
   transition: opacity 1.2s ease;
 }
@@ -75,7 +71,7 @@ body[data-view="fisherman"] #pond-canvas,
 body[data-view="theory"]    #pond-canvas,
 body[data-view="guide"]     #pond-canvas { opacity: 1; }
 
-/* 纸面薄纱：让文字可读，同时保留鱼的虚影。各视图浓淡不同。 */
+/* 绾搁潰钖勭罕锛氳鏂囧瓧鍙锛屽悓鏃朵繚鐣欓奔鐨勮櫄褰便€傚悇瑙嗗浘娴撴贰涓嶅悓銆?*/
 .veil {
   position: fixed;
   inset: 0;
@@ -97,7 +93,7 @@ body[data-view="fisherman"] .veil { opacity: .78; }
 body[data-view="theory"] .veil,
 body[data-view="guide"] .veil { opacity: .86; }
 
-/* 各视图露出多少湖色：读文字的页面淡一些，动手的页面多一点 */
+/* 鍚勮鍥鹃湶鍑哄灏戞箹鑹诧細璇绘枃瀛楃殑椤甸潰娣′竴浜涳紝鍔ㄦ墜鐨勯〉闈㈠涓€鐐?*/
 body[data-view="flow"]      .lake { opacity: .30; }
 body[data-view="result"]    .lake { opacity: .22; }
 body[data-view="book"]      .lake { opacity: .26; }
@@ -117,9 +113,9 @@ body[data-view="guide"]     .lake { opacity: .14; }
   flex-direction: column;
 }
 
-/* ---------------------------------------------------------------- 卷首 */
+/* ---------------------------------------------------------------- 鍗烽 */
 
-/* 卷首用 grid：上排是印与题名，下排整行留给导航，七个去处不会被挤到中间换行 */
+/* 鍗烽鐢?grid锛氫笂鎺掓槸鍗颁笌棰樺悕锛屼笅鎺掓暣琛岀暀缁欏鑸紝涓冧釜鍘诲涓嶄細琚尋鍒颁腑闂存崲琛?*/
 .masthead {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -167,7 +163,7 @@ body[data-view="guide"]     .lake { opacity: .14; }
   letter-spacing: .16em;
 }
 
-/* 导航：细线与节点，不用方框。上排是卷首题名，下排是七个去处，最左标出「你在这里」 */
+/* 瀵艰埅锛氱粏绾夸笌鑺傜偣锛屼笉鐢ㄦ柟妗嗐€備笂鎺掓槸鍗烽棰樺悕锛屼笅鎺掓槸涓冧釜鍘诲锛屾渶宸︽爣鍑恒€屼綘鍦ㄨ繖閲屻€?*/
 .ledger {
   grid-column: 1 / -1;
   display: flex;
@@ -183,7 +179,7 @@ body[data-view="guide"]     .lake { opacity: .14; }
   letter-spacing: .24em;
   color: var(--ink-faint);
 }
-.ledger-here::before { content: "◦ "; color: var(--vermilion-soft); }
+.ledger-here::before { content: "鈼?"; color: var(--vermilion-soft); }
 .ledger-here:empty { display: none; }
 .ledger button {
   appearance: none;
@@ -234,7 +230,7 @@ body[data-view="result"]    .ledger button[data-go="flow"] { color: var(--ink); 
   display: block;
 }
 
-/* ---------------------------------------------------------------- 视图切换 */
+/* ---------------------------------------------------------------- 瑙嗗浘鍒囨崲 */
 
 .stage { flex: 1 1 auto; padding-top: 34px; }
 
@@ -247,7 +243,8 @@ body[data-view="config"] .view[data-view="config"],
 body[data-view="joker"]  .view[data-view="joker"],
 body[data-view="fisherman"] .view[data-view="fisherman"],
 body[data-view="theory"] .view[data-view="theory"],
-body[data-view="guide"] .view[data-view="guide"] { display: block; }
+body[data-view="guide"] .view[data-view="guide"],
+body[data-view="community"] .view[data-view="community"] { display: block; }
 
 @keyframes rise {
   from { opacity: 0; transform: translateY(10px); }
@@ -255,19 +252,16 @@ body[data-view="guide"] .view[data-view="guide"] { display: block; }
 }
 
 /* ==========================================================================
-   卷首 · 思源湖
-   一张水彩画卷铺满视口宽度，下缘化进纸里；题跋（名称与上手三步）接在画下，
-   略微叠上画卷下缘，像题在画后。首页不放鱼，鱼留到别的页面。
-   ========================================================================== */
+   鍗烽 路 鎬濇簮婀?   涓€寮犳按褰╃敾鍗烽摵婊¤鍙ｅ搴︼紝涓嬬紭鍖栬繘绾搁噷锛涢璺嬶紙鍚嶇О涓庝笂鎵嬩笁姝ワ級鎺ュ湪鐢讳笅锛?   鐣ュ井鍙犱笂鐢诲嵎涓嬬紭锛屽儚棰樺湪鐢诲悗銆傞椤典笉鏀鹃奔锛岄奔鐣欏埌鍒殑椤甸潰銆?   ========================================================================== */
 
 .hero {
   position: relative;
   width: 100vw;
   margin-left: calc(50% - 50vw);
-  margin-top: -34px;                 /* 顶到卷首，抵掉 .stage 的上边距 */
+  margin-top: -34px;                 /* 椤跺埌鍗烽锛屾姷鎺?.stage 鐨勪笂杈硅窛 */
   height: clamp(280px, 52vh, 560px);
   overflow: hidden;
-  /* 图未到时先有天光，避免闪白 */
+  /* 鍥炬湭鍒版椂鍏堟湁澶╁厜锛岄伩鍏嶉棯鐧?*/
   background: linear-gradient(180deg, #dde8ee 0%, #e9eee9 62%, var(--paper) 100%);
 }
 .hero-art {
@@ -286,7 +280,7 @@ body[data-view="guide"] .view[data-view="guide"] { display: block; }
   to   { transform: scale(1.09) translate3d(0, -1.2%, 0); }
 }
 
-/* 画卷下缘化进纸里 */
+/* 鐢诲嵎涓嬬紭鍖栬繘绾搁噷 */
 .hero::after {
   content: "";
   position: absolute;
@@ -298,7 +292,7 @@ body[data-view="guide"] .view[data-view="guide"] { display: block; }
   background: linear-gradient(180deg, rgba(244, 240, 230, 0) 0%, rgba(244, 240, 230, .62) 54%, var(--paper) 100%);
 }
 
-/* 朱砂闲章 */
+/* 鏈辩爞闂茬珷 */
 .hero-seal {
   position: absolute;
   top: clamp(18px, 7%, 52px);
@@ -321,7 +315,7 @@ body[data-view="guide"] .view[data-view="guide"] { display: block; }
   to   { opacity: .95; transform: rotate(1.8deg) scale(1); }
 }
 
-/* 题跋：名称与两个入口 */
+/* 棰樿穻锛氬悕绉颁笌涓や釜鍏ュ彛 */
 .hero-copy { position: relative; z-index: 2; margin-top: -70px; }
 .hero-kicker {
   margin: 0;
@@ -347,7 +341,7 @@ body[data-view="guide"] .view[data-view="guide"] { display: block; }
 .hero-actions { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; margin-top: 28px; }
 .hero-note { margin: 18px 0 0; font-size: 12.5px; letter-spacing: .1em; color: var(--ink-faint); }
 
-/* 三步上手：细线分栏，没有方框 */
+/* 涓夋涓婃墜锛氱粏绾垮垎鏍忥紝娌℃湁鏂规 */
 .start { margin-top: 64px; }
 .start-steps {
   list-style: none;
@@ -373,7 +367,7 @@ body[data-view="guide"] .view[data-view="guide"] { display: block; }
 }
 .start-steps p { margin: 0 0 12px; font-size: 13.5px; color: var(--ink-mid); }
 
-/* 三件事：量一量 / 记下来 / 说出口 */
+/* 涓変欢浜嬶細閲忎竴閲?/ 璁颁笅鏉?/ 璇村嚭鍙?*/
 .triad { margin-top: 62px; }
 .triad-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 34px; }
 .triad-list article { border-top: 1px solid var(--hairline); padding-top: 16px; }
@@ -386,7 +380,7 @@ body[data-view="guide"] .view[data-view="guide"] { display: block; }
 }
 .triad-list p { margin: 0 0 12px; font-size: 13.5px; color: var(--ink-mid); }
 
-/* 卷中题记：取思源湖上空最淡的一片天色，四边都化进纸里，只留一句题记 */
+/* 鍗蜂腑棰樿锛氬彇鎬濇簮婀栦笂绌烘渶娣＄殑涓€鐗囧ぉ鑹诧紝鍥涜竟閮藉寲杩涚焊閲岋紝鍙暀涓€鍙ラ璁?*/
 .band {
   position: relative;
   width: 100vw;
@@ -420,7 +414,7 @@ body[data-view="guide"] .view[data-view="guide"] { display: block; }
   text-shadow: 0 0 14px rgba(244, 240, 230, .98), 0 0 30px rgba(244, 240, 230, .92);
 }
 
-/* 边界与真实求助入口 */
+/* 杈圭晫涓庣湡瀹炴眰鍔╁叆鍙?*/
 .support { margin-top: 58px; border-top: 1px solid var(--hairline); }
 .support > p { font-size: 14px; color: var(--ink-mid); max-width: 46em; }
 .support-title {
@@ -432,9 +426,9 @@ body[data-view="guide"] .view[data-view="guide"] { display: block; }
 }
 .support-list { list-style: none; margin: 0; padding: 0; max-width: 46em; }
 .support-list li { position: relative; padding-left: 18px; font-size: 13.5px; color: var(--ink-mid); }
-.support-list li::before { content: "·"; position: absolute; left: 4px; color: var(--vermilion-soft); }
+.support-list li::before { content: "路"; position: absolute; left: 4px; color: var(--vermilion-soft); }
 
-/* 分析页顶部的四步指示 */
+/* 鍒嗘瀽椤甸《閮ㄧ殑鍥涙鎸囩ず */
 .flow-steps {
   list-style: none;
   display: flex;
@@ -447,13 +441,13 @@ body[data-view="guide"] .view[data-view="guide"] { display: block; }
   color: var(--ink-faint);
 }
 .flow-steps li { position: relative; padding-bottom: 3px; }
-.flow-steps li + li::before { content: "·"; position: absolute; left: -14px; color: var(--hairline); }
+.flow-steps li + li::before { content: "路"; position: absolute; left: -14px; color: var(--hairline); }
 .flow-steps .on { color: var(--ink); border-bottom: 1px solid var(--vermilion-soft); }
 
-/* 卷尾格言 */
+/* 鍗峰熬鏍艰█ */
 .colophon-motto { font-family: var(--kai); letter-spacing: .2em; color: var(--ink-soft); }
 
-/* ---------------------------------------------------------------- 通用文字块 */
+/* ---------------------------------------------------------------- 閫氱敤鏂囧瓧鍧?*/
 
 .lede { max-width: 44em; margin-bottom: 34px; }
 .eyebrow {
@@ -472,7 +466,7 @@ body[data-view="guide"] .view[data-view="guide"] { display: block; }
 }
 .lede p { margin: 0; color: var(--ink-mid); font-size: 14.5px; }
 
-/* 板块标题：一个朱砂字 + 一条延伸的细线（线条引导） */
+/* 鏉垮潡鏍囬锛氫竴涓湵鐮傚瓧 + 涓€鏉″欢浼哥殑缁嗙嚎锛堢嚎鏉″紩瀵硷級 */
 .guidance-speech {
   display: flex;
   flex-wrap: wrap;
@@ -514,9 +508,9 @@ body[data-view="guide"] .view[data-view="guide"] { display: block; }
   color: var(--ink-mid);
 }
 
-/* ---------------------------------------------------------------- 按钮 */
+/* ---------------------------------------------------------------- 鎸夐挳 */
 
-/* 主行动：一枚朱砂印 */
+/* 涓昏鍔細涓€鏋氭湵鐮傚嵃 */
 .seal-btn {
   appearance: none;
   border: 0;
@@ -537,7 +531,7 @@ body[data-view="guide"] .view[data-view="guide"] { display: block; }
 .seal-btn.wide { min-width: 240px; margin-top: 22px; }
 .seal-btn.danger { background: rgba(120, 32, 24, .82); }
 
-/* 次行动：墨线文字 */
+/* 娆¤鍔細澧ㄧ嚎鏂囧瓧 */
 .line-btn {
   appearance: none;
   border: 0;
@@ -564,10 +558,9 @@ body[data-view="guide"] .view[data-view="guide"] { display: block; }
   margin: 18px 0;
 }
 
-/* ---------------------------------------------------------------- 表单（无框，只有底线） */
+/* ---------------------------------------------------------------- 琛ㄥ崟锛堟棤妗嗭紝鍙湁搴曠嚎锛?*/
 
-/* 输入控件一律只留一条底线：没有方框、没有底色区块。
-   input 不写 type 时（默认 text）属性选择器选不到，所以这里用 :not() 兜住。 */
+/* 杈撳叆鎺т欢涓€寰嬪彧鐣欎竴鏉″簳绾匡細娌℃湁鏂规銆佹病鏈夊簳鑹插尯鍧椼€?   input 涓嶅啓 type 鏃讹紙榛樿 text锛夊睘鎬ч€夋嫨鍣ㄩ€変笉鍒帮紝鎵€浠ヨ繖閲岀敤 :not() 鍏滀綇銆?*/
 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="submit"]):not([type="button"]),
 select,
 textarea {
@@ -589,7 +582,7 @@ input:focus, select:focus, textarea:focus {
 }
 ::placeholder { color: var(--ink-faint); }
 
-/* 大段文字：只用极淡的一层水色垫底，依旧没有边框 */
+/* 澶ф鏂囧瓧锛氬彧鐢ㄦ瀬娣＄殑涓€灞傛按鑹插灚搴曪紝渚濇棫娌℃湁杈规 */
 textarea {
   resize: vertical;
   line-height: 2;
@@ -638,6 +631,7 @@ select {
   transition: border-color .3s ease, background .3s ease;
 }
 .check input:hover { border-color: var(--ink-soft); }
+.check.disabled { opacity: .55; }
 .check input:checked {
   border-color: var(--vermilion-soft);
   background: var(--vermilion-soft) url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14'%3E%3Cpath d='M3.4 7.4l2.4 2.4 4.8-5.4' fill='none' stroke='%23fdfaf3' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
@@ -659,7 +653,7 @@ input[type="range"]::-webkit-slider-thumb {
   background: var(--ink-mid);
 }
 
-/* ---------------------------------------------------------------- 版面 */
+/* ---------------------------------------------------------------- 鐗堥潰 */
 
 .grid {
   display: grid;
@@ -667,7 +661,7 @@ input[type="range"]::-webkit-slider-thumb {
   gap: 54px;
   align-items: start;
 }
-/* 名册页：名册是窄栏（DOM 里排在前面），档案是宽栏 */
+/* 鍚嶅唽椤碉細鍚嶅唽鏄獎鏍忥紙DOM 閲屾帓鍦ㄥ墠闈級锛屾。妗堟槸瀹芥爮 */
 .grid-roster { grid-template-columns: 300px minmax(0, 1fr); }
 .col-side { position: relative; padding-left: 26px; }
 .col-side::before {
@@ -691,7 +685,7 @@ input[type="range"]::-webkit-slider-thumb {
   border-bottom: 1px solid var(--hairline-2);
 }
 
-/* ---------------------------------------------------------------- 示例与预览 */
+/* ---------------------------------------------------------------- 绀轰緥涓庨瑙?*/
 
 .demo-list { display: flex; flex-direction: column; gap: 2px; }
 .demo-item {
@@ -723,8 +717,8 @@ input[type="range"]::-webkit-slider-thumb {
   list-style: none;
 }
 .preview summary::-webkit-details-marker { display: none; }
-.preview summary::before { content: "＋ "; color: var(--vermilion-soft); }
-.preview[open] summary::before { content: "－ "; }
+.preview summary::before { content: "锛?"; color: var(--vermilion-soft); }
+.preview[open] summary::before { content: "锛?"; }
 .preview pre {
   white-space: pre-wrap;
   word-break: break-word;
@@ -739,7 +733,27 @@ input[type="range"]::-webkit-slider-thumb {
   overflow: auto;
 }
 
-/* ---------------------------------------------------------------- 结果页 */
+#redacted-json {
+  margin: 10px 0 0;
+  padding: 14px 16px;
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--ink-mid);
+  background: linear-gradient(180deg, rgba(255, 253, 248, .92) 0%, rgba(255, 253, 248, .55) 100%);
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--vermilion-soft);
+  border-radius: 3px;
+}
+#redacted-json .json-key { color: var(--vermilion); }
+#redacted-json .json-str { color: #4f7a4a; }
+#redacted-json .json-num { color: #8a6d3b; }
+#redacted-json .json-lit { color: #6b5580; }
+
+/* ---------------------------------------------------------------- 缁撴灉椤?*/
 
 .verdict { border-bottom: 1px solid var(--hairline); padding-bottom: 26px; }
 .verdict-line {
@@ -767,7 +781,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .verdict-text p { margin: 0; color: var(--ink-mid); font-size: 14.5px; }
 
-/* 类型印章 */
+/* 绫诲瀷鍗扮珷 */
 .seal-type {
   flex: none;
   width: 74px;
@@ -801,11 +815,11 @@ input[type="range"]::-webkit-slider-thumb {
   margin: 12px 0 0;
 }
 
-/* 五维：手绘墨线雷达 */
+/* 浜旂淮锛氭墜缁樺ⅷ绾块浄杈?*/
 .ink-chart { max-width: 460px; }
 .ink-chart svg { width: 100%; height: auto; display: block; overflow: visible; }
 
-/* ---------------------------------------------------------------- 五维指标悬停释义 */
+/* ---------------------------------------------------------------- 浜旂淮鎸囨爣鎮仠閲婁箟 */
 
 .metric-help-target {
   cursor: help;
@@ -948,7 +962,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .metric-item .val { font-size: 12.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 
-/* 双方比对：两笔墨线，不用柱子 */
+/* 鍙屾柟姣斿锛氫袱绗斿ⅷ绾匡紝涓嶇敤鏌卞瓙 */
 .compare { margin-top: 4px; }
 .compare-row {
   display: grid;
@@ -970,7 +984,7 @@ input[type="range"]::-webkit-slider-thumb {
   line-height: 1.7;
 }
 
-/* 长文 */
+/* 闀挎枃 */
 .long-text {
   max-width: 38em;
   font-size: 15px;
@@ -980,7 +994,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .long-text p { text-indent: 2em; margin: 0 0 1.1em; }
 
-/* ---------------------------------------------------------------- 找钓翁聊聊 · 对话 */
+/* ---------------------------------------------------------------- 鎵鹃挀缈佽亰鑱?路 瀵硅瘽 */
 
 .thread { min-height: 46vh; }
 .msg { max-width: 44em; margin: 0 0 30px; }
@@ -998,7 +1012,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .msg .meta { margin-top: 9px; font-size: 12px; color: var(--ink-faint); }
 
-/* 我说的话：靠右、右侧一道细线 */
+/* 鎴戣鐨勮瘽锛氶潬鍙炽€佸彸渚т竴閬撶粏绾?*/
 .msg.me {
   margin-left: auto;
   text-align: right;
@@ -1007,7 +1021,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .msg.me .body { color: var(--ink); }
 
-/* 钓翁说的话：靠左、左侧一道朱砂细线，像批注 */
+/* 閽撶縼璇寸殑璇濓細闈犲乏銆佸乏渚т竴閬撴湵鐮傜粏绾匡紝鍍忔壒娉?*/
 .msg.fisher {
   padding-left: 18px;
   border-left: 2px solid var(--vermilion-soft);
@@ -1019,7 +1033,7 @@ input[type="range"]::-webkit-slider-thumb {
 .msg.error .body { color: var(--vermilion); }
 
 .msg.streaming .body::after {
-  content: "▍";
+  content: "鈻?;
   color: var(--vermilion-soft);
   animation: caret 1s steps(2, start) infinite;
 }
@@ -1032,7 +1046,7 @@ input[type="range"]::-webkit-slider-thumb {
 .compose textarea { min-height: 92px; }
 .compose .line-actions { margin-bottom: 0; }
 
-/* ---------------------------------------------------------------- 名册 */
+/* ---------------------------------------------------------------- 鍚嶅唽 */
 
 .roster { margin: 18px 0 22px; }
 .roster-item {
@@ -1127,8 +1141,8 @@ input[type="range"]::-webkit-slider-thumb {
   list-style: none;
 }
 .fact summary::-webkit-details-marker { display: none; }
-.fact summary::before { content: "＋ "; color: var(--vermilion-soft); }
-.fact details[open] summary::before { content: "－ "; }
+.fact summary::before { content: "锛?"; color: var(--vermilion-soft); }
+.fact details[open] summary::before { content: "锛?"; }
 .fact blockquote {
   margin: 12px 0 0;
   padding-left: 16px;
@@ -1173,7 +1187,7 @@ input[type="range"]::-webkit-slider-thumb {
 .history-row p { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-soft); }
 .history-row .muted { font-size: 12.5px; color: var(--ink-faint); white-space: nowrap; }
 
-/* ---------------------------------------------------------------- 目录（线条引导） */
+/* ---------------------------------------------------------------- 鐩綍锛堢嚎鏉″紩瀵硷級 */
 
 .toc {
   position: relative;
@@ -1218,7 +1232,7 @@ input[type="range"]::-webkit-slider-thumb {
 .toc a:hover { color: var(--vermilion); }
 .toc a:hover::before { background: var(--vermilion-soft); }
 
-/* ---------------------------------------------------------------- 讲解页 */
+/* ---------------------------------------------------------------- 璁茶В椤?*/
 
 .steps { margin: 0 0 6px; padding-left: 1.4em; }
 .steps li { margin-bottom: 12px; font-size: 14.5px; color: var(--ink-mid); line-height: 2; }
@@ -1298,7 +1312,7 @@ input[type="range"]::-webkit-slider-thumb {
   letter-spacing: .04em;
 }
 .faq summary::-webkit-details-marker { display: none; }
-.faq summary::before { content: "问 "; color: var(--vermilion-soft); }
+.faq summary::before { content: "闂?"; color: var(--vermilion-soft); }
 .faq details[open] summary { color: var(--ink); }
 .faq details p {
   margin: 0 0 16px;
@@ -1317,7 +1331,7 @@ input[type="range"]::-webkit-slider-thumb {
   line-height: 1.95;
 }
 
-/* ---------------------------------------------------------------- 理论页 */
+/* ---------------------------------------------------------------- 鐞嗚椤?*/
 
 .entry {
   padding: 24px 0 20px;
@@ -1414,7 +1428,7 @@ input[type="range"]::-webkit-slider-thumb {
 .refs a:hover { color: var(--vermilion); }
 .refs a span { color: var(--ink-faint); font-size: 12px; margin-left: 10px; }
 
-/* ---------------------------------------------------------------- 卷尾 */
+/* ---------------------------------------------------------------- 鍗峰熬 */
 
 .colophon {
   margin-top: 62px;
@@ -1431,7 +1445,7 @@ input[type="range"]::-webkit-slider-thumb {
 .colophon i { width: 1px; height: 12px; background: var(--hairline); display: block; }
 .music-line { margin: 6px 0 0; }
 
-/* ---------------------------------------------------------------- 遮罩 / 吐司 / 弹窗 */
+/* ---------------------------------------------------------------- 閬僵 / 鍚愬徃 / 寮圭獥 */
 
 .loading {
   position: fixed;
@@ -1498,14 +1512,14 @@ dialog h2 {
   letter-spacing: .1em;
 }
 
-/* ---------------------------------------------------------------- 滚动条 */
+/* ---------------------------------------------------------------- 婊氬姩鏉?*/
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(35, 33, 32, .16); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(35, 33, 32, .3); }
 
-/* ---------------------------------------------------------------- 窄屏 */
+/* ---------------------------------------------------------------- 绐勫睆 */
 
 @media (max-width: 900px) {
   .scroll { padding: 22px 20px 40px; }
@@ -1524,7 +1538,7 @@ dialog h2 {
   .compare-row { grid-template-columns: 4.5em 1fr 6.5em; gap: 10px; }
 }
 
-/* 卷首在窄屏：画卷矮一些，题跋少叠一点，分栏改成一柱到底 */
+/* 鍗烽鍦ㄧ獎灞忥細鐢诲嵎鐭竴浜涳紝棰樿穻灏戝彔涓€鐐癸紝鍒嗘爮鏀规垚涓€鏌卞埌搴?*/
 @media (max-width: 900px) {
   .hero { height: clamp(210px, 36vh, 330px); margin-top: -22px; }
   .hero-art { object-position: center 52%; }
@@ -1546,23 +1560,142 @@ dialog h2 {
   .triad-list { gap: 18px; }
 }
 
-/* ---------------------------------------------------------------- 长截图校对表 */
+/* ---------------------------------------------------------------- 闀挎埅鍥炬牎瀵硅〃 */
 
-.ocr-table { margin: 12px 0 4px; }
-.ocr-row { padding: 12px 0; border-top: 1px solid var(--hairline-2); }
-.ocr-row:first-child { border-top: 0; }
-.ocr-row-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.ocr-index {
-  min-width: 1.8em;
+.ocr-table {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 12px 0 4px;
+  padding: 16px 14px;
+  border: 1px solid var(--hairline-2);
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(236, 230, 216, .85) 0%, rgba(236, 230, 216, .5) 100%);
+}
+.ocr-row { display: flex; flex-direction: column; gap: 4px; }
+.ocr-row.side-self { align-items: flex-end; }
+.ocr-row.side-other { align-items: flex-start; }
+.ocr-line { display: flex; align-items: flex-start; gap: 8px; max-width: 88%; }
+.ocr-face {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  background: rgba(255, 253, 248, .92);
+  border: 1px solid var(--hairline);
+  font-family: var(--kai);
+  font-size: 16px;
+  color: var(--ink-mid);
+}
+.ocr-face-img {
+  object-fit: cover;
+  padding: 0;
+  background: #fff;
+}
+.ocr-bubble {
+  position: relative;
+  max-width: 100%;
+  min-width: 5em;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid rgba(35, 33, 32, .1);
+  box-shadow: 0 1px 1px rgba(35, 33, 32, .04);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.ocr-row.side-self .ocr-bubble { background: #95ec69; border-color: rgba(90, 160, 50, .35); }
+.ocr-bubble::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  border: 6px solid transparent;
+}
+.ocr-row.side-other .ocr-bubble::before { left: -11px; border-right-color: #fff; }
+.ocr-row.side-self .ocr-bubble::before { right: -11px; border-left-color: #95ec69; }
+
+/* 琛ㄦ儏/鍥剧墖锛氫笉瑕佹皵娉″簳妗嗭紝鍥惧湪涓娿€佹杩板湪涓?*/
+.ocr-bubble-visual {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  max-width: min(78vw, 300px);
+  flex-direction: column;
+  align-items: flex-start;
+}
+.ocr-bubble-visual::before { display: none; }
+.ocr-bubble-visual .ocr-thumb {
+  max-width: 100%;
+  max-height: 220px;
+  border: 1px solid var(--hairline);
+}
+.ocr-bubble-visual .ocr-content {
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(255, 253, 248, .78);
+}
+.ocr-bubble-text {
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.7;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+.ocr-bubble-text:hover { filter: brightness(.97); }
+.ocr-content {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 8em;
+  min-height: 0;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--ink);
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ocr-thumb {
+  display: block;
+  max-width: 120px;
+  max-height: 120px;
+  border-radius: 6px;
+  cursor: zoom-in;
+  background: rgba(255, 253, 248, .6);
+}
+.ocr-thumb.small { max-width: 64px; max-height: 64px; margin: 4px 0 2px; }
+.ocr-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  max-width: 88%;
   font-size: 12px;
+  color: var(--ink-soft);
+}
+.ocr-row.side-self .ocr-meta { justify-content: flex-end; }
+.ocr-index {
+  font-size: 11.5px;
   letter-spacing: .1em;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
 }
-.ocr-select { width: auto; font-size: 12.5px; padding: 4px 22px 4px 2px; }
-.ocr-content { margin-top: 6px; }
-.ocr-row-foot { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
-.ocr-time { width: 12em; font-size: 12.5px; color: var(--ink-soft); }
+.ocr-meta-name { color: var(--ink-mid); }
+.ocr-meta-time { color: var(--ink-faint); }
+.ocr-select { width: auto; font-size: 12.5px; padding: 2px 20px 2px 2px; }
+.ocr-time { width: 10em; font-size: 12.5px; color: var(--ink-soft); }
 .ocr-guess {
   font-size: 11.5px;
   letter-spacing: .12em;
@@ -1573,6 +1706,7 @@ dialog h2 {
 .ocr-row[data-kind="sticker"] .ocr-content,
 .ocr-row[data-kind="image"] .ocr-content,
 .ocr-row[data-kind="voice"] .ocr-content { color: var(--ink-soft); }
+.ocr-summary-item { margin-bottom: 10px; }
 
 .ocr-avatars { margin: 10px 0 4px; }
 .ocr-avatar-row { display: flex; gap: 22px; align-items: center; margin: 8px 0; }
@@ -1585,49 +1719,6 @@ dialog h2 {
   border: 1px solid var(--hairline);
 }
 
-.ocr-row.closed { padding: 8px 0; }
-.ocr-summary {
-  flex: 1;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px;
-  min-width: 0;
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
-  color: var(--ink-mid);
-  background: transparent;
-  border: 0;
-  border-bottom: 1px dashed var(--hairline-2);
-  padding: 2px 0 4px;
-  cursor: pointer;
-}
-.ocr-summary:hover { color: var(--ink); border-bottom-color: var(--hairline); }
-.ocr-summary .ocr-speaker { color: var(--ink); letter-spacing: .06em; }
-.ocr-summary .ocr-meta { font-size: 11.5px; color: var(--ink-faint); white-space: nowrap; }
-.ocr-summary .ocr-preview {
-  flex: 1 1 12em;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--ink-soft);
-}
-.ocr-row-body { margin-top: 8px; }
-.ocr-row-controls { display: flex; flex-wrap: wrap; gap: 12px; }
-.ocr-thumb {
-  display: block;
-  max-width: 96px;
-  max-height: 96px;
-  margin: 2px 0 8px;
-  border: 1px solid var(--hairline);
-  border-radius: 4px;
-  cursor: zoom-in;
-  background: rgba(255, 253, 248, .5);
-}
-.ocr-thumb.small { max-width: 64px; max-height: 64px; margin: 4px 0 2px; }
-.ocr-collapse { margin-left: auto; font-size: 12px; }
 .ocr-summary-item { margin-bottom: 10px; }
 
 #image-dialog { max-width: min(92vw, 760px); }
@@ -1641,9 +1732,9 @@ dialog h2 {
   background: rgba(255, 253, 248, .6);
 }
 
-/* ---------------------------------------------------------------- 小丑鉴定所 */
+/* ---------------------------------------------------------------- 灏忎笐閴村畾鎵€ */
 
-/* 导航标识：朱砂底 + 跳动红点，与素色导航形成对比 */
+/* 瀵艰埅鏍囪瘑锛氭湵鐮傚簳 + 璺冲姩绾㈢偣锛屼笌绱犺壊瀵艰埅褰㈡垚瀵规瘮 */
 .ledger .nav-joker {
   color: #fdfaf3;
   background: var(--vermilion);
@@ -1676,13 +1767,13 @@ dialog h2 {
 }
 body[data-view="joker"] .ledger button[data-go="joker"] { background: #8f3227; }
 
-/* 首页印章入口：全身马戏团小丑（固定在整屏最右侧）+ 竖排朱砂印章 */
+/* 棣栭〉鍗扮珷鍏ュ彛锛氬叏韬┈鎴忓洟灏忎笐锛堝浐瀹氬湪鏁村睆鏈€鍙充晶锛? 绔栨帓鏈辩爞鍗扮珷 */
 .joker-seal {
   position: fixed;
   right: max(16px, 2.2vw);
   top: 50%;
   transform: translateY(-50%);
-  z-index: 30;              /* 高于首页画卷与薄纱，避免被图片遮住 */
+  z-index: 30;              /* 楂樹簬棣栭〉鐢诲嵎涓庤杽绾憋紝閬垮厤琚浘鐗囬伄浣?*/
   isolation: isolate;
   appearance: none;
   border: 0;
@@ -1693,7 +1784,7 @@ body[data-view="joker"] .ledger button[data-go="joker"] { background: #8f3227; }
   align-items: center;
   gap: 8px;
 }
-/* 只在首页显示，其余页面让位给正文 */
+/* 鍙湪棣栭〉鏄剧ず锛屽叾浣欓〉闈㈣浣嶇粰姝ｆ枃 */
 body[data-view="pond"] .joker-seal { display: flex; }
 .joker-seal:hover .joker-seal-figure { transform: rotate(-2.5deg) scale(1.06); }
 .joker-seal-figure {
@@ -1729,13 +1820,13 @@ body[data-view="pond"] .joker-seal { display: flex; }
   .joker-seal-figure { width: 104px; height: 196px; }
 }
 @media (max-width: 820px) {
-  /* 窄屏右侧没有空位，直接隐藏入口（导航里的「小丑鉴定所」仍在） */
+  /* 绐勫睆鍙充晶娌℃湁绌轰綅锛岀洿鎺ラ殣钘忓叆鍙ｏ紙瀵艰埅閲岀殑銆屽皬涓戦壌瀹氭墍銆嶄粛鍦級 */
   .joker-seal { display: none !important; }
 }
 
-/* 鉴定所视图 */
+/* 閴村畾鎵€瑙嗗浘 */
 .joker-lede h2 { color: var(--vermilion); }
-/* 六征上方的全身马戏团小丑 */
+/* 鍏緛涓婃柟鐨勫叏韬┈鎴忓洟灏忎笐 */
 .joker-aside-figure {
   display: block;
   width: 138px;
@@ -1757,7 +1848,7 @@ body[data-view="pond"] .joker-seal { display: flex; }
   position: relative;
 }
 .joker-sign-list li::before {
-  content: "·";
+  content: "路";
   position: absolute;
   left: .2em;
   color: var(--vermilion);
@@ -1769,7 +1860,7 @@ body[data-view="pond"] .joker-seal { display: flex; }
   padding: 13px 0 13px .42em;
 }
 
-/* 判定弹窗 */
+/* 鍒ゅ畾寮圭獥 */
 .joker-dialog {
   position: relative;
   max-width: 560px;
@@ -1777,7 +1868,7 @@ body[data-view="pond"] .joker-seal { display: flex; }
   padding-right: 128px;
 }
 .joker-dialog::backdrop { background: rgba(30, 24, 22, .45); }
-/* 右上角静态小丑：按类型放置对应形象 */
+/* 鍙充笂瑙掗潤鎬佸皬涓戯細鎸夌被鍨嬫斁缃搴斿舰璞?*/
 .joker-dialog-figure {
   position: absolute;
   top: 16px;
@@ -1836,7 +1927,7 @@ body[data-view="pond"] .joker-seal { display: flex; }
 .joker-signs .sign-label { flex: none; width: 5.4em; color: var(--ink-mid); }
 .joker-signs .sign-detail { flex: 1 1 auto; min-width: 0; }
 
-/* 全屏小丑层 */
+/* 鍏ㄥ睆灏忎笐灞?*/
 #clown-layer {
   position: fixed;
   inset: 0;
@@ -1943,3 +2034,153 @@ body[data-view="pond"] .joker-seal { display: flex; }
   white-space: nowrap;
 }
 .clown-bubble.show { opacity: 1; transform: translateY(0) scale(1); }
+
+/* ================== 小丑社区 · 头像选择器 ================== */
+.avatar-picker {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.avatar-option {
+    appearance: none;
+    background: #fffdf8;
+    border: 1px solid #e2d8cc;
+    border-radius: 8px;
+    padding: 8px 4px 6px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+}
+
+.avatar-option:hover {
+    background: #faf6f0;
+    transform: translateY(-1px);
+}
+
+.avatar-option.selected {
+    border-color: #a63c30;
+    background: #faf1ee;
+    box-shadow: 0 0 0 2px rgba(166, 60, 48, 0.14);
+}
+
+.avatar-option-fig {
+    width: 46px;
+    height: 52px;
+    display: inline-block;
+}
+
+.avatar-option-fig svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.avatar-option-name {
+    font-size: 12px;
+    color: #666;
+    letter-spacing: 0.02em;
+}
+
+.avatar-option.selected .avatar-option-name {
+    color: #a63c30;
+}
+
+/* ================== 小丑队列动画 ================== */
+.clown-parade {
+    overflow: hidden;
+    margin: 4px 0 18px;
+    padding: 10px 0 4px;
+    border-bottom: 1px dashed #e2d8cc;
+}
+
+.clown-parade-inner {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.parade-clown {
+    width: 76px;
+    height: 93px;
+    flex: none;
+    transform-origin: 50% 100%;
+    animation: parade-sway 2.6s ease-in-out infinite;
+}
+
+.parade-clown svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.parade-clown .clown-hand {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: clown-pinch 3.4s ease-in-out infinite;
+}
+
+.parade-clown .clown-nose {
+    transform-box: fill-box;
+    transform-origin: 50px 61px;
+    animation: clown-nose 3.4s ease-in-out infinite;
+}
+
+@keyframes parade-sway {
+    0%, 100% { transform: rotate(-3deg) translateY(0); }
+    50%      { transform: rotate(3deg) translateY(-4px); }
+}
+
+@keyframes clown-pinch {
+    0%, 52%, 100% { transform: translate(0, 0); }
+    66%           { transform: translate(-18px, -34px); }
+    74%           { transform: translate(-18px, -35px); }
+    84%           { transform: translate(-18px, -34px); }
+}
+
+@keyframes clown-nose {
+    0%, 62%, 92%, 100% { transform: scale(1); }
+    74%                { transform: scale(0.82, 0.9); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .parade-clown,
+    .clown-hand,
+    .clown-nose {
+        animation: none;
+    }
+}
+
+/* ================== 账号栏头像 ================== */
+.account-avatar {
+    width: 26px;
+    height: 30px;
+    flex: none;
+    display: inline-block;
+}
+
+.account-avatar svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* ================== 榜单条目头像 ================== */
+.entry-avatar {
+    width: 40px;
+    height: 46px;
+    flex: none;
+    display: inline-block;
+}
+
+.entry-avatar svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
