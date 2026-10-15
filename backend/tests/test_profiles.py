@@ -255,14 +255,25 @@ def test_config_test_uses_fictional_data_and_distinguishes_verification(client, 
     assert response.json()["error"]["code"] == "invalid_output"
 
 
+def test_ai_error_detail_flags_cooling_deployment():
+    """网关 'No deployments available / cooldown' 要映射成「模型暂不可用」，而不是笼统的限流。"""
+    from app.services.profiles import ai_error_detail
+    exc = Exception("429 No deployments available for selected model, Try again in 5 seconds. cooldown_list=[...]")
+    detail = ai_error_detail(exc)
+    assert detail["code"] == "model_unavailable"
+    assert "冷却" in detail["message"]
+
+
 def test_deepseek_v4_requests_final_json_without_default_thinking():
     ai = FakeAI('{"items":[]}')
     ai.base_url = 'https://api.deepseek.com/v1/'
     extract_ai([{"id": 0, "role": "other", "content": "我喜欢徒步"}], ai, 'deepseek-v4-pro')
     assert ai.calls[0]["extra_body"] == {"thinking": {"type": "disabled"}}
+    extract_ai([{"id": 0, "role": "other", "content": "我喜欢徒步"}], ai, 'deepseek-flash')
+    assert ai.calls[1]["extra_body"] == {"thinking": {"type": "disabled"}}
     ai.base_url = 'https://another-provider.invalid/v1/'
     extract_ai([{"id": 0, "role": "other", "content": "我喜欢徒步"}], ai, 'custom-model')
-    assert "extra_body" not in ai.calls[1]
+    assert "extra_body" not in ai.calls[2]
 
 
 def test_ai_not_configured_is_actionable(client):

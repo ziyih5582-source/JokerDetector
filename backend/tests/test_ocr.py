@@ -117,6 +117,18 @@ def message(speaker, content):
             "kind": "text", "emoji_emotion": None}
 
 
+def test_merge_keeps_distinct_stickers_and_adjacent_identical():
+    def sticker(image_id):
+        return {"speaker": "我", "content": "[表情]", "time": None, "time_guessed": False,
+                "kind": "sticker", "emoji_emotion": None, "image": image_id}
+    merged, removed = ocr.merge_message_batches([[sticker("a"), sticker("b")]])
+    assert [m["image"] for m in merged] == ["a", "b"]
+    assert removed == 0
+    # 同一张表情连发两次是正常的，不能被当成重复删掉
+    merged, removed = ocr.merge_message_batches([[sticker("a"), sticker("a")]])
+    assert len(merged) == 2 and removed == 0
+
+
 def test_merge_message_batches_removes_seam_overlap():
     first = [message("对方", "第一句"), message("我", "第二句")]
     second = [message("我", "第二句"), message("对方", "第三句")]
@@ -293,6 +305,213 @@ def test_parse_image_rejects_too_many(client):
     files = [("files", (f"{i}.png", b"x", "image/png")) for i in range(config.MAX_IMAGES + 1)]
     response = client.post("/api/profiles/parse-image", files=files)
     assert response.status_code == 400
+
+
+def test_parse_image_describes_stickers_when_requested(client, monkeypatch):
+    from app.api import deps
+    from app.services import vision
+    sticker = {"speaker": "我", "content": "[表情]", "time": None, "time_guessed": False,
+               "kind": "sticker", "emoji_emotion": None,
+               "image": "data:image/png;base64,AAAA", "_y": 300.0}
+    monkeypatch.setattr(ocr, "recognize_image", lambda _image: [box("你好", 120, 300, w=120)])
+    monkeypatch.setattr(ocr, "detect_nontext_bubbles", lambda *a, **k: [dict(sticker)])
+    monkeypatch.setattr(config, "vision_model", lambda: "qwen")
+    monkeypatch.setattr(vision, "available", lambda: True)
+    monkeypatch.setattr(vision, "parallel_workers", lambda: 1)
+    monkeypatch.setattr(deps.analyzer, "client", object())
+    calls = []
+
+    def fake_interpret(url, hint_kind="sticker", **_kwargs):
+        calls.append(url)
+        return {"kind": "sticker", "character": "小猫", "summary": "吐舌卖萌，很得意"}
+
+    monkeypatch.setattr(vision, "interpret_data_url", fake_interpret)
+    image = Image.new("RGB", (600, 800), "white")
+    response = client.post("/api/profiles/parse-image",
+                           files={"file": ("chat.png", png_bytes(image), "image/png")},
+                           data={"describe": "true"})
+    assert response.status_code == 200
+    body = response.json()
+    assert calls == ["data:image/png;base64,AAAA"]
+    sticker_message = next(m for m in body["messages"] if m["kind"] == "sticker")
+    assert sticker_message["content"] == "[表情：小猫，吐舌卖萌，很得意]"
+    assert "成功 1 个" in body["warning"]
+
+
+def test_vision_avoids_repeating_character(client, monkeypatch):
+    """概述里已含主角时，不再重复拼接主角名。"""
+    from app.api import deps
+    from app.services import vision
+    sticker = {"speaker": "我", "content": "[表情]", "time": None, "time_guessed": False,
+               "kind": "sticker", "emoji_emotion": None,
+               "image": "data:image/png;base64,AAAA", "_y": 300.0}
+    monkeypatch.setattr(ocr, "recognize_image", lambda _image: [box("你好", 120, 300, w=120)])
+    monkeypatch.setattr(ocr, "detect_nontext_bubbles", lambda *a, **k: [dict(sticker)])
+    monkeypatch.setattr(config, "vision_model", lambda: "qwen3.8-27b")
+    monkeypatch.setattr(vision, "available", lambda: True)
+    monkeypatch.setattr(vision, "parallel_workers", lambda: 1)
+    monkeypatch.setattr(deps.analyzer, "client", object())
+    monkeypatch.setattr(vision, "interpret_data_url",
+                        lambda url, hint_kind="sticker", **_k: {"kind": "sticker", "character": "小猫", "summary": "小猫吐舌卖萌"})
+    image = Image.new("RGB", (600, 800), "white")
+    response = client.post("/api/profiles/parse-image",
+                           files={"file": ("chat.png", png_bytes(image), "image/png")},
+                           data={"describe": "true"})
+    message = next(m for m in response.json()["messages"] if m.get("image"))
+    assert message["content"] == "[表情：小猫吐舌卖萌]"
+
+
+def test_vision_can_flip_sticker_to_image(client, monkeypatch):
+    """按气泡大小猜错时，以视觉模型的判断为准更新类型。"""
+    from app.api import deps
+    from app.services import vision
+    sticker = {"speaker": "我", "content": "[表情]", "time": None, "time_guessed": False,
+               "kind": "sticker", "emoji_emotion": None,
+               "image": "data:image/png;base64,AAAA", "_y": 300.0}
+    monkeypatch.setattr(ocr, "recognize_image", lambda _image: [box("你好", 120, 300, w=120)])
+    monkeypatch.setattr(ocr, "detect_nontext_bubbles", lambda *a, **k: [dict(sticker)])
+    monkeypatch.setattr(config, "vision_model", lambda: "qwen")
+    monkeypatch.setattr(vision, "available", lambda: True)
+    monkeypatch.setattr(vision, "parallel_workers", lambda: 1)
+    monkeypatch.setattr(deps.analyzer, "client", object())
+    monkeypatch.setattr(vision, "interpret_data_url",
+                        lambda url, hint_kind="sticker", **_k: {"kind": "image", "character": "", "summary": "一只猫的照片"})
+    image = Image.new("RGB", (600, 800), "white")
+    response = client.post("/api/profiles/parse-image",
+                           files={"file": ("chat.png", png_bytes(image), "image/png")},
+                           data={"describe": "true"})
+    message = next(m for m in response.json()["messages"] if m.get("image"))
+    assert message["kind"] == "image"
+    assert message["content"] == "[图片：一只猫的照片]"
+
+
+def test_parse_image_skips_vision_without_consent(client, monkeypatch):
+    from app.api import deps
+    from app.services import vision
+    sticker = {"speaker": "我", "content": "[表情]", "time": None, "time_guessed": False,
+               "kind": "sticker", "emoji_emotion": None,
+               "image": "data:image/png;base64,AAAA", "_y": 300.0}
+    monkeypatch.setattr(ocr, "recognize_image", lambda _image: [box("你好", 120, 300, w=120)])
+    monkeypatch.setattr(ocr, "detect_nontext_bubbles", lambda *a, **k: [dict(sticker)])
+    monkeypatch.setattr(config, "vision_model", lambda: "qwen")
+    monkeypatch.setattr(vision, "available", lambda: True)
+    monkeypatch.setattr(vision, "parallel_workers", lambda: 1)
+    monkeypatch.setattr(deps.analyzer, "client", object())
+    calls = []
+    monkeypatch.setattr(vision, "interpret_data_url",
+                        lambda url, hint_kind="sticker", **_k: calls.append(url) or {"kind": "sticker", "character": "", "summary": "忽略"})
+    image = Image.new("RGB", (600, 800), "white")
+    response = client.post("/api/profiles/parse-image",
+                           files={"file": ("chat.png", png_bytes(image), "image/png")},
+                           data={"describe": "false"})
+    assert response.status_code == 200
+    assert calls == []
+    sticker_message = next(m for m in response.json()["messages"] if m["kind"] == "sticker")
+    assert sticker_message["content"] == "[表情]"
+
+
+def test_vision_describes_more_than_twenty_stickers(client, monkeypatch):
+    """上限放宽后，一批里几十个表情都要能识别（用假客户端，不真的发请求）。"""
+    import time as time_module
+    from app.api import deps
+    from app.services import vision
+    stickers = [{"speaker": "我", "content": "[表情]", "time": None, "time_guessed": False,
+                 "kind": "sticker", "emoji_emotion": None,
+                 "image": f"data:image/png;base64,AAA{i}", "_y": float(200 + i)} for i in range(25)]
+    monkeypatch.setattr(ocr, "recognize_image", lambda _image: [box("你好", 120, 300, w=120)])
+    monkeypatch.setattr(ocr, "detect_nontext_bubbles", lambda *a, **k: [dict(s) for s in stickers])
+    monkeypatch.setattr(config, "vision_model", lambda: "qwen")
+    monkeypatch.setattr(vision, "available", lambda: True)
+    monkeypatch.setattr(vision, "parallel_workers", lambda: 1)
+    monkeypatch.setattr(deps.analyzer, "client", object())
+    monkeypatch.setattr(time_module, "sleep", lambda _seconds: None)
+    calls = []
+    monkeypatch.setattr(vision, "interpret_data_url",
+                        lambda url, hint_kind="sticker", **_k: calls.append(url) or {"kind": "sticker", "character": "猫", "summary": "情绪"})
+    image = Image.new("RGB", (600, 800), "white")
+    response = client.post("/api/profiles/parse-image",
+                           files={"file": ("chat.png", png_bytes(image), "image/png")},
+                           data={"describe": "true"})
+    assert response.status_code == 200
+    assert len(calls) == 25
+    assert "成功 25 个" in response.json()["warning"]
+
+
+def test_describe_endpoint_refills_content(client, monkeypatch):
+    """「重新识别」接口：只补没概述的条目，返回可直接回填的 kind/content。"""
+    from app.api import deps
+    from app.services import vision
+    monkeypatch.setattr(config, "vision_model", lambda: "qwen3.8-27b")
+    monkeypatch.setattr(vision, "available", lambda: True)
+    monkeypatch.setattr(vision, "parallel_workers", lambda: 1)
+    monkeypatch.setattr(deps.analyzer, "client", object())
+    monkeypatch.setattr(vision, "interpret_data_url",
+                        lambda url, hint_kind="sticker", **_k: {"kind": "sticker", "character": "柴犬", "summary": "doge 式惊讶"})
+    response = client.post("/api/profiles/describe", json={"items": [
+        {"id": "3", "kind": "sticker", "image": "data:image/png;base64,AAAA"}]})
+    assert response.status_code == 200
+    result = response.json()["results"][0]
+    assert result["id"] == "3"
+    assert result["kind"] == "sticker"
+    assert result["content"] == "[表情：柴犬，doge 式惊讶]"
+
+
+def test_describe_endpoint_requires_vision(client, monkeypatch):
+    monkeypatch.setattr(config, "vision_model", lambda: "")
+    response = client.post("/api/profiles/describe", json={"items": [
+        {"id": "0", "kind": "sticker", "image": "data:image/png;base64,AAAA"}]})
+    assert response.status_code == 400
+
+
+def test_text_sticker_is_detected_and_text_removed():
+    """带文字的表情包：既识别成表情，又不把贴纸里的字当成聊天文字。"""
+    pytest.importorskip("cv2")
+    image = Image.new("RGB", (600, 800), (237, 237, 237))
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle([440, 250, 560, 370], radius=10, fill=(250, 90, 90))
+    draw.rectangle([475, 295, 525, 325], fill=(20, 20, 20))
+    draw.rounded_rectangle([120, 500, 400, 580], radius=14, fill=(255, 255, 255))
+    boxes = [box("哈哈", 500, 310, w=80), box("你好", 200, 540, w=120)]
+    messages = ocr.build_messages(image, boxes)
+    assert any(m["kind"] == "sticker" for m in messages), [m["kind"] for m in messages]
+    assert all("哈哈" not in m["content"] for m in messages)
+    assert any(m["content"] == "你好" for m in messages)
+
+
+def test_white_background_sticker_with_caption_is_detected():
+    """白底带标题的猫表情：整块算一个表情，标题不成为聊天文字。"""
+    pytest.importorskip("cv2")
+    image = Image.new("RGB", (600, 800), (237, 237, 237))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle([430, 250, 560, 380], fill=(255, 255, 255))
+    draw.rectangle([448, 262, 542, 288], fill=(20, 20, 20))
+    draw.ellipse([460, 300, 535, 370], fill=(240, 170, 90))
+    boxes = [box("小发雷霆", 495, 275, w=90)]
+    messages = ocr.build_messages(image, boxes)
+    assert any(m["kind"] == "sticker" for m in messages), [m["kind"] for m in messages]
+    assert all("小发雷霆" not in m["content"] for m in messages)
+
+
+def test_long_text_message_is_not_a_sticker():
+    pytest.importorskip("cv2")
+    image = Image.new("RGB", (600, 800), (237, 237, 237))
+    ImageDraw.Draw(image).rounded_rectangle([120, 200, 560, 260], radius=14, fill=(255, 255, 255))
+    boxes = [box("这是一条很长的普通文字消息内容", 340, 230, w=420)]
+    messages = ocr.build_messages(image, boxes)
+    assert all(m["kind"] == "text" for m in messages)
+    assert any("很长的普通文字" in m["content"] for m in messages)
+
+
+def test_bottom_input_bar_is_not_a_sticker():
+    """底部输入条（含麦克风/表情/加号图标）不能被当成图片/表情。"""
+    pytest.importorskip("cv2")
+    image = Image.new("RGB", (600, 1400), (237, 237, 237))
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle([400, 300, 520, 420], radius=10, fill=(250, 90, 90))
+    draw.rounded_rectangle([60, 1150, 460, 1210], radius=16, fill=(255, 255, 255))
+    draw.ellipse([500, 1155, 545, 1200], fill=(150, 150, 150))
+    found = ocr.detect_nontext_bubbles(image, [], 600, 1400)
+    assert [f["kind"] for f in found] == ["sticker"]
 
 
 def test_parse_image_rejects_bad_suffix(client):

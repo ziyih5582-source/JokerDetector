@@ -753,7 +753,7 @@ input[type="range"]::-webkit-slider-thumb {
 #redacted-json .json-num { color: #8a6d3b; }
 #redacted-json .json-lit { color: #6b5580; }
 
-/* ---------------------------------------------------------------- 缁撴灉椤?*/
+/* ---------------------------------------------------------------- 结果页 */
 
 .verdict { border-bottom: 1px solid var(--hairline); padding-bottom: 26px; }
 .verdict-line {
@@ -1618,7 +1618,7 @@ dialog h2 {
 .ocr-row.side-other .ocr-bubble::before { left: -11px; border-right-color: #fff; }
 .ocr-row.side-self .ocr-bubble::before { right: -11px; border-left-color: #95ec69; }
 
-/* 琛ㄦ儏/鍥剧墖锛氫笉瑕佹皵娉″簳妗嗭紝鍥惧湪涓娿€佹杩板湪涓?*/
+/* 表情/图片：不要气泡底框，图在上、概述在下 */
 .ocr-bubble-visual {
   background: transparent;
   border: 0;

@@ -32,6 +32,11 @@ def ai_error_detail(exc):
     if any("timeout" in type(e).__name__.lower() for e in chain):
         return {"code": "timeout", "message": "AI 服务响应超时，请稍后重试或缩短聊天片段"}
     status = getattr(exc, "status_code", None)
+    provider_text = str(exc)
+    if "No deployments available" in provider_text or "cooldown" in provider_text.lower():
+        return {"code": "model_unavailable",
+                "message": "所选模型暂无可用实例（服务商部署冷却中），请稍后重试，或换一个模型/服务商",
+                "status": status or 429}
     messages = {
         400: ("invalid_request", "AI 服务拒绝请求，请检查模型 ID 以及服务是否支持 Chat Completions 和 JSON 输出"),
         401: ("authentication", "API Key 无效或已失效，请检查密钥与 API 地址是否属于同一服务商"),
@@ -56,7 +61,9 @@ def ai_error_detail(exc):
 
 
 def ai_request_options(client, model):
-    if urlsplit(str(getattr(client, "base_url", ""))).hostname == "api.deepseek.com" and model.startswith("deepseek-v4"):
+    """DeepSeek 官方的思考模式会占满短输出预算，这里统一关掉，保证短 JSON / 识图短句能正常返回。"""
+    if urlsplit(str(getattr(client, "base_url", ""))).hostname == "api.deepseek.com" \
+            and model.startswith(("deepseek-v4", "deepseek-flash")):
         return {"extra_body": {"thinking": {"type": "disabled"}}}
     return {}
 
@@ -103,10 +110,18 @@ def prepare_messages(messages, self_speaker, other_speaker):
             if len(name) > 1:
                 content = content.replace(name, alias)
         entry = {"id": i, "role": "other" if m["speaker"] == other_speaker else "self", "content": redact(content)}
-        # 表情/图片的情绪作为独立字段：只在存在时写入，避免改变无情绪片段的指纹
+        # 情绪/时间/类型作为独立字段：只在存在时写入，避免改变无这些信息片段的指纹
         emotion = (m.get("emotion") or "").strip()
         if emotion:
             entry["emotion"] = emotion[:32]
+        time_label = (m.get("time") or "").strip()
+        if time_label:
+            entry["time"] = time_label[:32]
+            if m.get("time_guessed"):
+                entry["time_guessed"] = True
+        kind = (m.get("kind") or "").strip()
+        if kind and kind != "text":
+            entry["kind"] = kind[:16]
         result.append(entry)
     return result
 

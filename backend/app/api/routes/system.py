@@ -7,13 +7,16 @@ Demo 清单、解说数据源与类型定义。
 
 from __future__ import annotations
 
+import base64
+import io
 import os
 
 from fastapi import APIRouter, HTTPException
+from PIL import Image, ImageDraw
 
 from app.api.deps import analyzer
 from app.core import config
-from app.schemas import AIConfigInfo
+from app.schemas import AIConfigInfo, VisionConfigInput
 from app.services.analyzer import (
     JOKER_TYPES,
     METRIC_WEIGHTS,
@@ -24,6 +27,7 @@ from app.services.analyzer import (
 )
 from app.services.demo_data import DEMO_CASES
 from app.services import ocr
+from app.services import vision
 from app.services.profiles import ai_error_detail, extract_ai
 from app.services.report import LEVEL_THRESHOLDS, METRIC_DOCS
 
@@ -41,6 +45,9 @@ async def health():
         "ai_provider": str(analyzer.client.base_url) if analyzer.ai_available else None,
         "music_available": os.path.exists(config.MUSIC_DIR),
         "ocr_available": ocr.available(),
+        "vision_available": vision.available(),
+        "vision_model": config.vision_model() or None,
+        "vision_provider": config.vision_base_url() if vision.available() else None,
         "version": config.APP_VERSION,
     }
 
@@ -63,7 +70,59 @@ async def get_config():
         configured=analyzer.ai_available,
         model=analyzer.ai_model if analyzer.ai_available else None,
         base_url=str(analyzer.client.base_url) if analyzer.ai_available else None,
+        vision_configured=vision.available(),
+        vision_model=config.vision_model() or None,
+        vision_base_url=os.getenv("VISION_BASE_URL", "").strip() or None,
+        vision_key_set=bool(os.getenv("VISION_API_KEY", "").strip()),
     )
+
+
+@router.post("/config/vision")
+def save_vision_config(body: VisionConfigInput):
+    """在网页里修改识图 API：写进本机 .env 并立即生效。密钥只进不出，绝不回传。"""
+    if body.base_url and not body.base_url.strip().lower().startswith(("http://", "https://")):
+        raise HTTPException(400, "接口地址必须以 http:// 或 https:// 开头")
+    if body.model is None and body.base_url is None and body.api_key is None:
+        raise HTTPException(400, "没有需要保存的内容")
+    config.save_vision_config(api_key=body.api_key, base_url=body.base_url, model=body.model)
+    vision.reset_client()
+    return AIConfigInfo(
+        configured=analyzer.ai_available,
+        model=analyzer.ai_model if analyzer.ai_available else None,
+        base_url=str(analyzer.client.base_url) if analyzer.ai_available else None,
+        vision_configured=vision.available(),
+        vision_model=config.vision_model() or None,
+        vision_base_url=os.getenv("VISION_BASE_URL", "").strip() or None,
+        vision_key_set=bool(os.getenv("VISION_API_KEY", "").strip()),
+    )
+
+
+@router.post("/config/vision/test")
+def test_vision_config():
+    """用一张固定的虚构小图验证识图 API；不发任何真实聊天内容。"""
+    if not config.vision_model():
+        return {"success": False, "error": "尚未填写模型名"}
+    if not vision.available():
+        return {"success": False, "error": "尚未配置可用的识图 Key（可在上方填写，或沿用主 Key）"}
+    image = Image.new("RGB", (96, 96), "white")
+    draw = ImageDraw.Draw(image)
+    draw.ellipse([12, 12, 84, 84], fill=(245, 205, 70))
+    draw.ellipse([34, 38, 44, 48], fill=(40, 40, 40))
+    draw.ellipse([56, 38, 66, 48], fill=(40, 40, 40))
+    draw.arc([32, 52, 68, 78], start=10, end=170, fill=(40, 40, 40), width=4)
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    image_url = "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
+    try:
+        result = vision.interpret_data_url(image_url, hint_kind="sticker")
+    except Exception as exc:
+        return {"success": False, "error": ai_error_detail(exc)["message"]}
+    return {
+        "success": True,
+        "model": config.vision_model(),
+        "kind": result["kind"],
+        "summary": result["summary"] or result["character"],
+    }
 
 
 @router.post("/config/reload")

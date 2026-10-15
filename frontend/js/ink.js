@@ -18,6 +18,8 @@
     ocrUsed: false,
     ocrAvatars: null,
     ocrOtherName: null,
+    ocrWarning: '',
+    redactedJson: '',
     jokerMessages: [],
     jokerOcrName: null,
     editFactId: null,
@@ -233,6 +235,7 @@
       var paused = window.Pond.setPaused(!window.Pond.isPaused());
       $('pond-toggle').textContent = paused ? '继续湖面动画' : '暂停湖面动画';
     });
+    $('pond-toggle').textContent = window.Pond.isPaused() ? '继续湖面动画' : '暂停湖面动画';
   }
 
   // ------------------------------------------------------------ 视图与导航
@@ -328,6 +331,35 @@
       var text = $(ids[2]);
       if (text) text.textContent = available ? '导入长截图（可多选）' : '导入长截图（未装 OCR 依赖）';
     });
+    syncVisionEntry();
+  }
+
+  var VISION_TEXT = '长截图里的表情/图片，用云端视觉模型写一句内容描述（会把这些裁块发给云端 AI；可取消）';
+  var VISION_TEXT_OFF = '未配置视觉模型（DEEPSEEK_VISION_MODEL），表情/图片只能标为 [表情]/[图片]。';
+
+  function syncVisionEntry() {
+    var available = !(state.health && state.health.vision_available === false);
+    [[
+      'describe-images', 'describe-row', 'describe-text'
+    ], [
+      'joker-describe-images', 'joker-describe-row', 'joker-describe-text'
+    ]].forEach(function (ids) {
+      var box = $(ids[0]);
+      if (!box) return;
+      box.disabled = !available;
+      var row = $(ids[1]);
+      if (row) row.classList.toggle('disabled', !available);
+      var text = $(ids[2]);
+      if (text) text.textContent = available ? VISION_TEXT : VISION_TEXT_OFF;
+    });
+  }
+
+  function wantsVisionDescribe(id) {
+    var box = $(id);
+    if (!box) return false;
+    // 注意：请求期间 busy(true) 会把控件临时 disabled，这里不能因此当成"用户不要"。
+    var available = !(state.health && state.health.vision_available === false);
+    return !!box.checked && available;
   }
 
   async function selectContact(id) {
@@ -471,6 +503,7 @@
     state.ocrUsed = false;
     state.ocrAvatars = null;
     state.ocrOtherName = null;
+    state.ocrWarning = '';
     $('chat-text').value = '';
     $('chat-file').value = '';
     $('chat-image').value = '';
@@ -478,7 +511,11 @@
     $('ocr-review').hidden = true;
     $('ocr-table').replaceChildren();
     $('ocr-note').textContent = '';
-    $('redacted-preview').textContent = '';
+    if ($('ocr-retry-vision')) {
+      $('ocr-retry-vision').hidden = true;
+      $('ocr-vision-count').textContent = '';
+    }
+    resetPreview();
     $('message-count').textContent = '';
     $('save-consent').checked = false;
   }
@@ -488,6 +525,11 @@
       messages: state.messages.map(function (m) {
         var message = { speaker: m.speaker, content: m.content };
         if (m.emoji_emotion) message.emotion = m.emoji_emotion;
+        if (m.time) {
+          message.time = m.time;
+          message.time_guessed = !!m.time_guessed;
+        }
+        if (m.kind && m.kind !== 'text') message.kind = m.kind;
         return message;
       }),
       self_speaker: $('self-speaker').value,
@@ -500,11 +542,32 @@
     };
   }
 
+  function resetPreview() {
+    $('redacted-preview').textContent = '';
+    $('redacted-json').textContent = '';
+    $('redacted-json').hidden = true;
+    if ($('toggle-json')) $('toggle-json').textContent = '查看 JSON';
+    state.redactedJson = '';
+  }
+
+  function highlightJson(text) {
+    var escaped = String(text)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return escaped
+      .replace(/^(\s*)"([^"]+)":/gm, '$1<span class="json-key">"$2"</span>:')
+      .replace(/(: )("(?:[^"\\]|\\.)*")/g, '$1<span class="json-str">$2</span>')
+      .replace(/(: )(-?\d+)(,?)$/gm, '$1<span class="json-num">$2</span>$3')
+      .replace(/(: )(true|false|null)(,?)$/gm, '$1<span class="json-lit">$2</span>$3');
+  }
+
   function applyPreview(data) {
     $('redacted-preview').textContent = data.messages.map(function (m) {
       var emotion = m.emotion ? '（表情情绪：' + m.emotion + '）' : '';
-      return (m.id + 1) + '. ' + (m.role === 'self' ? '自己' : '对方') + '：' + m.content + emotion;
+      var time = m.time ? ('〔' + m.time + (m.time_guessed ? '·推测' : '') + '〕') : '';
+      return (m.id + 1) + '. ' + (m.role === 'self' ? '自己' : '对方') + '：' + m.content + emotion + time;
     }).join('\n');
+    state.redactedJson = data.ai_payload || '';
+    $('redacted-json').innerHTML = state.redactedJson ? highlightJson(state.redactedJson) : '';
     $('preview-count').textContent = '· ' + data.messages.length + ' 条';
     syncOptions();
   }
@@ -518,7 +581,7 @@
 
   async function preview() {
     $('save-consent').checked = false;
-    $('redacted-preview').textContent = '';
+    resetPreview();
     var data = await api('/api/profiles/preview', { method: 'POST', body: JSON.stringify(previewBody()) });
     applyPreview(data);
   }
@@ -564,7 +627,6 @@
   var OCR_KINDS = [['text', '文字'], ['sticker', '表情'], ['image', '图片'], ['voice', '语音']];
   var OCR_KIND_LABEL = { text: '文字', sticker: '表情', image: '图片', voice: '语音' };
   var OCR_KIND_DEFAULT = { text: '', sticker: '[表情]', image: '[图片]', voice: '[语音]' };
-  var OCR_EMOTIONS = ['', '开心', '伤心', '生气', '惊讶', '无语', '害羞', '爱心', '疑问'];
 
   function labeledSelect(options, value, onPick, title) {
     var select = el('select', 'ocr-select');
@@ -616,12 +678,6 @@
     return speaker === '对方' ? (state.ocrOtherName || '对方') : '我';
   }
 
-  function emotionOptions(message) {
-    var emotions = OCR_EMOTIONS.slice();
-    if (message.emoji_emotion && emotions.indexOf(message.emoji_emotion) < 0) emotions.push(message.emoji_emotion);
-    return emotions.map(function (emotion) { return [emotion, emotion || '情绪?']; });
-  }
-
   function applyKindChange(message, value) {
     var previous = OCR_KIND_DEFAULT[message.kind] || '';
     message.kind = value;
@@ -636,7 +692,110 @@
     if (dialog.showModal) dialog.showModal();
   }
 
+  function autoGrow(node) {
+    node.style.height = 'auto';
+    node.style.height = (node.scrollHeight + 2) + 'px';
+  }
+
+  function avatarFor(speaker) {
+    var avatars = state.ocrAvatars;
+    if (!avatars) return null;
+    var side = speaker === '我' ? avatars.self : avatars.other;
+    return (side && side.image) || null;
+  }
+
+  function makeFace(speaker, display) {
+    var source = avatarFor(speaker);
+    if (source) {
+      var image = el('img', 'ocr-face ocr-face-img');
+      image.src = source;
+      image.alt = display;
+      return image;
+    }
+    return el('div', 'ocr-face', display.slice(0, 1));
+  }
+
+  function makeContentInput(message, onChange) {
+    var content = document.createElement('textarea');
+    content.rows = 1;
+    content.className = 'ocr-content';
+    content.value = message.content;
+    content.placeholder = '消息内容';
+    content.addEventListener('input', function () {
+      message.content = content.value;
+      autoGrow(content);
+      if (onChange) onChange();
+    });
+    return content;
+  }
+
+  function needsVision(message) {
+    return (message.kind === 'sticker' || message.kind === 'image')
+      && !!message.image
+      && (message.content === '[表情]' || message.content === '[图片]');
+  }
+
+  function syncVisionRetry() {
+    var button = $('ocr-retry-vision');
+    if (!button) return;
+    var pending = state.ocrUsed ? state.messages.filter(needsVision).length : 0;
+    button.hidden = pending === 0;
+    button.textContent = '重新识别未概述的图片/表情（' + pending + '）';
+    var note = $('ocr-vision-count');
+    if (note) {
+      note.textContent = pending
+        ? '这些还没概述：点左侧重试；网关繁忙时多试几次即可'
+        : (state.ocrUsed ? '表情/图片都已有概述' : '');
+    }
+  }
+
+  async function retryVision() {
+    var targets = [];
+    state.messages.forEach(function (message, index) {
+      if (needsVision(message)) targets.push({ index: index, id: String(index), kind: message.kind, image: message.image });
+    });
+    if (!targets.length) {
+      say('没有需要重新识别的表情/图片。');
+      return;
+    }
+    var size = 8, updated = 0, failed = 0;
+    try {
+      for (var start = 0; start < targets.length; start += size) {
+        var chunk = targets.slice(start, start + size);
+        loading(true, ['正在重新识别表情/图片… ' + Math.min(start + chunk.length, targets.length) + '/' + targets.length,
+          '网关繁忙时会慢一些，请稍等…']);
+        var data;
+        try {
+          data = await api('/api/profiles/describe', {
+            method: 'POST',
+            body: JSON.stringify({ items: chunk.map(function (t) { return { id: t.id, kind: t.kind, image: t.image }; }) })
+          });
+        } catch (error) {
+          failed += chunk.length;
+          continue;
+        }
+        var byId = {};
+        chunk.forEach(function (t) { byId[t.id] = t; });
+        (data.results || []).forEach(function (result) {
+          var target = byId[String(result.id)];
+          if (!target) return;
+          var message = state.messages[target.index];
+          if (result.error || !result.content) { failed += 1; return; }
+          message.kind = result.kind || message.kind;
+          message.content = result.content;
+          updated += 1;
+        });
+        renderOcrReview(state.ocrWarning);
+        schedulePreview();
+      }
+    } finally {
+      loading(false);
+    }
+    say('重新识别：成功 ' + updated + ' 个' + (failed ? '，失败 ' + failed + ' 个（可再点一次）' : '') + '。', failed > 0);
+  }
+
   function renderOcrReview(warning) {
+    warning = warning || state.ocrWarning;
     $('ocr-note').textContent = warning ||
       '识别结果仅供参考：文字默认折叠，点「展开」可改字、切换发言者、修正时间；图片与表情常展开，可直接选情绪并点缩略图查看原图。标「推测」的时间来自最近的一个可见时间分隔。';
     var table = $('ocr-table');
@@ -644,38 +803,87 @@
     state.messages.forEach(function (message, index) {
       var visual = isVisualKind(message.kind);
       var expanded = visual || !!message.open;
-      var row = el('div', 'ocr-row' + (expanded ? '' : ' closed'));
+      var mine = message.speaker === '我';
+      var row = el('div', 'ocr-row ' + (mine ? 'side-self' : 'side-other') + (expanded ? '' : ' closed'));
       row.dataset.kind = message.kind || 'text';
 
-      var head = el('div', 'ocr-row-head');
-      head.append(el('span', 'ocr-index', String(index + 1)));
-      if (visual) {
-        head.append(labeledSelect(speakerOptions(), message.speaker, function (value) {
+      var line = el('div', 'ocr-line');
+      var face = makeFace(message.speaker, displayName(message.speaker));
+      var bubble;
+      if (expanded) {
+        bubble = el('div', 'ocr-bubble' + (visual ? ' ocr-bubble-visual' : ''));
+        if (visual && message.image) {
+          var thumb = document.createElement('img');
+          thumb.className = 'ocr-thumb';
+          thumb.src = message.image;
+          thumb.alt = kindLabel(message.kind);
+          thumb.title = '点击查看大图';
+          thumb.addEventListener('click', function () { openImageView(message.image); });
+          bubble.append(thumb);
+        }
+        bubble.append(makeContentInput(message, schedulePreview));
+      } else {
+        bubble = el('button', 'ocr-bubble ocr-bubble-text', message.content);
+        bubble.type = 'button';
+        bubble.title = '点击展开修改';
+        bubble.addEventListener('click', function () {
+          message.open = true;
+          renderOcrReview(warning);
+        });
+      }
+      if (mine) {
+        line.append(bubble);
+        line.append(face);
+      } else {
+        line.append(face);
+        line.append(bubble);
+      }
+      row.append(line);
+
+      var meta = el('div', 'ocr-meta');
+      meta.append(el('span', 'ocr-index', String(index + 1)));
+      meta.append(el('span', 'ocr-meta-name', displayName(message.speaker)));
+      meta.append(el('span', 'ocr-meta-time', timeLabel(message)));
+      if (expanded) {
+        meta.append(labeledSelect(speakerOptions(), message.speaker, function (value) {
           message.speaker = value;
+          renderOcrReview(warning);
           schedulePreview();
         }, '这条是谁说的'));
-        head.append(labeledSelect(OCR_KINDS, message.kind, function (value) {
+        meta.append(labeledSelect(OCR_KINDS, message.kind, function (value) {
           applyKindChange(message, value);
           renderOcrReview(warning);
           schedulePreview();
         }, '消息类型'));
-        head.append(labeledSelect(emotionOptions(message), message.emoji_emotion || '', function (value) {
-          message.emoji_emotion = value;
-          schedulePreview();
-        }, '表情情绪（可自动或手选）'));
+        var time = document.createElement('input');
+        time.type = 'text';
+        time.className = 'ocr-time';
+        time.value = message.time || '';
+        time.placeholder = '时间（可空）';
+        time.addEventListener('input', function () {
+          message.time = time.value;
+          message.time_guessed = false;
+          updateTimeBadge(meta, message);
+        });
+        meta.append(time);
+        updateTimeBadge(meta, message);
+        if (!visual) {
+          var collapse = el('button', 'line-btn quiet', '收起');
+          collapse.type = 'button';
+          collapse.addEventListener('click', function () {
+            message.open = false;
+            renderOcrReview(warning);
+          });
+          meta.append(collapse);
+        }
       } else {
-        var summary = el('button', 'ocr-summary');
-        summary.type = 'button';
-        summary.title = expanded ? '点击收起修改' : '点击展开修改';
-        summary.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-        summary.append(el('span', 'ocr-speaker', displayName(message.speaker)));
-        summary.append(el('span', 'ocr-meta', kindLabel(message.kind) + ' · ' + timeLabel(message)));
-        summary.append(el('span', 'ocr-preview', message.content));
-        summary.addEventListener('click', function () {
-          message.open = !message.open;
+        var expand = el('button', 'line-btn quiet', '展开修改');
+        expand.type = 'button';
+        expand.addEventListener('click', function () {
+          message.open = true;
           renderOcrReview(warning);
         });
-        head.append(summary);
+        meta.append(expand);
       }
       var remove = el('button', 'line-btn quiet ocr-del', '删除');
       remove.type = 'button';
@@ -685,72 +893,13 @@
         updateOcrCount();
         schedulePreview();
       });
-      head.append(remove);
-      row.append(head);
-
-      if (expanded) {
-        var body = el('div', 'ocr-row-body');
-        if (visual && message.image) {
-          var thumb = document.createElement('img');
-          thumb.className = 'ocr-thumb';
-          thumb.src = message.image;
-          thumb.alt = kindLabel(message.kind);
-          thumb.title = '点击查看大图';
-          thumb.addEventListener('click', function () { openImageView(message.image); });
-          body.append(thumb);
-        }
-        if (!visual) {
-          var controls = el('div', 'ocr-row-controls');
-          controls.append(labeledSelect(speakerOptions(), message.speaker, function (value) {
-            message.speaker = value;
-            schedulePreview();
-          }, '这条是谁说的'));
-          controls.append(labeledSelect(OCR_KINDS, message.kind || 'text', function (value) {
-            applyKindChange(message, value);
-            renderOcrReview(warning);
-            schedulePreview();
-          }, '消息类型'));
-          body.append(controls);
-        }
-        var content = document.createElement('input');
-        content.type = 'text';
-        content.className = 'ocr-content';
-        content.value = message.content;
-        content.placeholder = '消息内容';
-        content.addEventListener('input', function () {
-          message.content = content.value;
-          schedulePreview();
-        });
-        body.append(content);
-
-        var foot = el('div', 'ocr-row-foot');
-        var time = document.createElement('input');
-        time.type = 'text';
-        time.className = 'ocr-time';
-        time.value = message.time || '';
-        time.placeholder = '时间（可空）';
-        time.addEventListener('input', function () {
-          message.time = time.value;
-          message.time_guessed = false;
-          updateTimeBadge(foot, message);
-        });
-        foot.append(time);
-        updateTimeBadge(foot, message);
-        if (!visual) {
-          var collapse = el('button', 'line-btn quiet ocr-collapse', '收起');
-          collapse.type = 'button';
-          collapse.addEventListener('click', function () {
-            message.open = false;
-            renderOcrReview(warning);
-          });
-          foot.append(collapse);
-        }
-        body.append(foot);
-        row.append(body);
-      }
+      meta.append(remove);
+      row.append(meta);
       table.append(row);
     });
     $('ocr-review').hidden = false;
+    Array.prototype.forEach.call(table.querySelectorAll('textarea.ocr-content'), autoGrow);
+    syncVisionRetry();
   }
 
   function renderOcrAvatars() {
@@ -803,6 +952,7 @@
     state.ocrUsed = true;
     state.ocrAvatars = avatars || null;
     state.ocrOtherName = otherName || null;
+    state.ocrWarning = warning || '';
     ['self-speaker', 'other-speaker'].forEach(function (id) {
       var select = $(id);
       select.replaceChildren();
@@ -1508,6 +1658,13 @@ bindMetricTooltip(label, metricKey, metric);
           ? (data.ai_verified ? '已配置并验证通过 · ' + data.ai_model : '已配置，尚未验证 · ' + data.ai_model)
           : '未配置：请在项目根目录 .env 填写 DEEPSEEK_API_KEY 后点「重新加载配置」。';
       }
+      var visionEl = $('vision-config-state');
+      if (visionEl) {
+        visionEl.textContent = data.vision_available
+          ? '表情/图片识别：' + data.vision_model + ' @ ' + data.vision_provider
+            + '（可在下方改成你自己的多模态 API）'
+          : '表情/图片识别未配置：在下方填模型名与 Key（或沿用主 Key）。';
+      }
       if ($('fisher-status') && !state.fisher.streaming) {
         $('fisher-status').textContent = data.ai_available
           ? '钓翁已就绪 · ' + data.ai_model
@@ -1540,6 +1697,64 @@ bindMetricTooltip(label, metricKey, metric);
         await health();
       });
     });
+
+    $('vision-save').addEventListener('click', function () {
+      guard(async function () {
+        var payload = {
+          model: $('vision-model').value.trim(),
+          base_url: $('vision-base').value.trim()
+        };
+        var key = $('vision-key').value.trim();
+        if (key) payload.api_key = key;
+        var info = await api('/api/config/vision', { method: 'POST', body: JSON.stringify(payload) });
+        $('vision-key').value = '';
+        applyVisionInfo(info);
+        $('vision-msg').textContent = info.vision_configured
+          ? '已保存并生效：' + info.vision_model + '。'
+          : '已保存，但还不够用：请填模型名（并确保有可用的 Key）。';
+        await health();
+      });
+    });
+
+    $('vision-clear').addEventListener('click', function () {
+      guard(async function () {
+        var info = await api('/api/config/vision', {
+          method: 'POST', body: JSON.stringify({ model: '', base_url: '', api_key: '' })
+        });
+        $('vision-key').value = '';
+        $('vision-model').value = '';
+        $('vision-base').value = '';
+        applyVisionInfo(info);
+        $('vision-msg').textContent = '已清除，回落到主服务商的视觉模型。';
+        await health();
+      });
+    });
+
+    $('vision-test').addEventListener('click', function () {
+      guard(async function () {
+        $('vision-msg').textContent = '正在用一张固定的虚构小图验证…';
+        var data = await api('/api/config/vision/test', { method: 'POST' });
+        $('vision-msg').textContent = data.success
+          ? ('验证成功：' + data.model + ' · 识别为「' + (data.summary || data.kind) + '」')
+          : ('验证失败：' + data.error);
+      });
+    });
+
+    api('/api/config').then(applyVisionInfo).catch(function () {});
+  }
+
+  function applyVisionInfo(info) {
+    if (!info) return;
+    var configured = info.vision_configured !== undefined ? info.vision_configured : info.vision_available;
+    var state = $('vision-config-state');
+    if (state) {
+      state.textContent = configured
+        ? '表情/图片识别：' + (info.vision_model || '') + ' @ ' + (info.vision_base_url || info.vision_provider || '')
+          + '（可在下方改成你自己的多模态 API）'
+        : '表情/图片识别未配置：在下方填模型名与 Key（或沿用主 Key）。';
+    }
+    if ($('vision-model') && !$('vision-model').value) $('vision-model').value = info.vision_model || '';
+    if ($('vision-base') && !$('vision-base').value) $('vision-base').value = info.vision_base_url || '';
   }
 
   // ------------------------------------------------------------ 小丑鉴定所
@@ -1614,9 +1829,10 @@ bindMetricTooltip(label, metricKey, metric);
           });
           var form = new FormData();
           files.forEach(function (file) { form.append('files', file); });
+          form.append('describe', wantsVisionDescribe('joker-describe-images') ? 'true' : 'false');
           loading(true, files.length > 1
-            ? ['正在读 ' + files.length + ' 张截图…', '把气泡摆回原位…', '接好每一段的缝…']
-            : ['正在读这一长条截图…', '把气泡摆回原位…', '认出说话的人…']);
+            ? ['正在读 ' + files.length + ' 张截图…', '把气泡摆回原位…', '接好每一段的缝…', '等视觉模型看表情与图片…', '表情较多时会慢一些，请稍等…']
+            : ['正在读这一长条截图…', '把气泡摆回原位…', '认出说话的人…', '等视觉模型看表情与图片…', '表情较多时会慢一些，请稍等…']);
           var parsed;
           try {
             parsed = await api('/api/profiles/parse-image', { method: 'POST', body: form });
@@ -1740,48 +1956,15 @@ bindMetricTooltip(label, metricKey, metric);
     state.jokerMessages.forEach(function (message, index) {
       var visual = isVisualKind(message.kind);
       var expanded = visual || !!message.open;
-      var row = el('div', 'ocr-row' + (expanded ? '' : ' closed'));
+      var mine = message.speaker === '我';
+      var row = el('div', 'ocr-row ' + (mine ? 'side-self' : 'side-other') + (expanded ? '' : ' closed'));
       row.dataset.kind = message.kind || 'text';
 
-      var head = el('div', 'ocr-row-head');
-      head.append(el('span', 'ocr-index', String(index + 1)));
-      if (visual) {
-        head.append(labeledSelect(jokerSpeakerOptions(), message.speaker, function (value) {
-          message.speaker = value;
-        }, '这条是谁说的'));
-        head.append(labeledSelect(OCR_KINDS, message.kind, function (value) {
-          applyKindChange(message, value);
-          renderJokerOcrReview(warning);
-        }, '消息类型'));
-        head.append(labeledSelect(emotionOptions(message), message.emoji_emotion || '', function (value) {
-          message.emoji_emotion = value;
-        }, '表情情绪（可自动或手选）'));
-      } else {
-        var summary = el('button', 'ocr-summary');
-        summary.type = 'button';
-        summary.title = expanded ? '点击收起修改' : '点击展开修改';
-        summary.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-        summary.append(el('span', 'ocr-speaker', jokerDisplayName(message.speaker)));
-        summary.append(el('span', 'ocr-meta', kindLabel(message.kind) + ' · ' + timeLabel(message)));
-        summary.append(el('span', 'ocr-preview', message.content));
-        summary.addEventListener('click', function () {
-          message.open = !message.open;
-          renderJokerOcrReview(warning);
-        });
-        head.append(summary);
-      }
-      var remove = el('button', 'line-btn quiet ocr-del', '删除');
-      remove.type = 'button';
-      remove.addEventListener('click', function () {
-        state.jokerMessages.splice(index, 1);
-        renderJokerOcrReview(warning);
-        $('joker-message-count').textContent = '已识别 ' + state.jokerMessages.length + ' 条，请逐条核对';
-      });
-      head.append(remove);
-      row.append(head);
-
+      var line = el('div', 'ocr-line');
+      var face = makeFace(message.speaker, jokerDisplayName(message.speaker));
+      var bubble;
       if (expanded) {
-        var body = el('div', 'ocr-row-body');
+        bubble = el('div', 'ocr-bubble' + (visual ? ' ocr-bubble-visual' : ''));
         if (visual && message.image) {
           var thumb = document.createElement('img');
           thumb.className = 'ocr-thumb';
@@ -1789,30 +1972,40 @@ bindMetricTooltip(label, metricKey, metric);
           thumb.alt = kindLabel(message.kind);
           thumb.title = '点击查看大图';
           thumb.addEventListener('click', function () { openImageView(message.image); });
-          body.append(thumb);
+          bubble.append(thumb);
         }
-        if (!visual) {
-          var controls = el('div', 'ocr-row-controls');
-          controls.append(labeledSelect(jokerSpeakerOptions(), message.speaker, function (value) {
-            message.speaker = value;
-          }, '这条是谁说的'));
-          controls.append(labeledSelect(OCR_KINDS, message.kind || 'text', function (value) {
-            applyKindChange(message, value);
-            renderJokerOcrReview(warning);
-          }, '消息类型'));
-          body.append(controls);
-        }
-        var content = document.createElement('input');
-        content.type = 'text';
-        content.className = 'ocr-content';
-        content.value = message.content;
-        content.placeholder = '消息内容';
-        content.addEventListener('input', function () {
-          message.content = content.value;
+        bubble.append(makeContentInput(message));
+      } else {
+        bubble = el('button', 'ocr-bubble ocr-bubble-text', message.content);
+        bubble.type = 'button';
+        bubble.title = '点击展开修改';
+        bubble.addEventListener('click', function () {
+          message.open = true;
+          renderJokerOcrReview(warning);
         });
-        body.append(content);
+      }
+      if (mine) {
+        line.append(bubble);
+        line.append(face);
+      } else {
+        line.append(face);
+        line.append(bubble);
+      }
+      row.append(line);
 
-        var foot = el('div', 'ocr-row-foot');
+      var meta = el('div', 'ocr-meta');
+      meta.append(el('span', 'ocr-index', String(index + 1)));
+      meta.append(el('span', 'ocr-meta-name', jokerDisplayName(message.speaker)));
+      meta.append(el('span', 'ocr-meta-time', timeLabel(message)));
+      if (expanded) {
+        meta.append(labeledSelect(jokerSpeakerOptions(), message.speaker, function (value) {
+          message.speaker = value;
+          renderJokerOcrReview(warning);
+        }, '这条是谁说的'));
+        meta.append(labeledSelect(OCR_KINDS, message.kind, function (value) {
+          applyKindChange(message, value);
+          renderJokerOcrReview(warning);
+        }, '消息类型'));
         var time = document.createElement('input');
         time.type = 'text';
         time.className = 'ocr-time';
@@ -1821,25 +2014,41 @@ bindMetricTooltip(label, metricKey, metric);
         time.addEventListener('input', function () {
           message.time = time.value;
           message.time_guessed = false;
-          updateTimeBadge(foot, message);
+          updateTimeBadge(meta, message);
         });
-        foot.append(time);
-        updateTimeBadge(foot, message);
+        meta.append(time);
+        updateTimeBadge(meta, message);
         if (!visual) {
-          var collapse = el('button', 'line-btn quiet ocr-collapse', '收起');
+          var collapse = el('button', 'line-btn quiet', '收起');
           collapse.type = 'button';
           collapse.addEventListener('click', function () {
             message.open = false;
             renderJokerOcrReview(warning);
           });
-          foot.append(collapse);
+          meta.append(collapse);
         }
-        body.append(foot);
-        row.append(body);
+      } else {
+        var expand = el('button', 'line-btn quiet', '展开修改');
+        expand.type = 'button';
+        expand.addEventListener('click', function () {
+          message.open = true;
+          renderJokerOcrReview(warning);
+        });
+        meta.append(expand);
       }
+      var remove = el('button', 'line-btn quiet ocr-del', '删除');
+      remove.type = 'button';
+      remove.addEventListener('click', function () {
+        state.jokerMessages.splice(index, 1);
+        renderJokerOcrReview(warning);
+        $('joker-message-count').textContent = '已识别 ' + state.jokerMessages.length + ' 条，请逐条核对';
+      });
+      meta.append(remove);
+      row.append(meta);
       table.append(row);
     });
     $('joker-ocr-review').hidden = false;
+    Array.prototype.forEach.call(table.querySelectorAll('textarea.ocr-content'), autoGrow);
   }
 
   async function jokerDetect() {
@@ -2008,6 +2217,7 @@ bindMetricTooltip(label, metricKey, metric);
   function initFlow() {
     $('parse-text').addEventListener('click', function () { guard(parseText); });
     $('clear-chat').addEventListener('click', function () { clearChat(); syncOptions(); say('已清空本次内容。'); });
+    $('ocr-retry-vision').addEventListener('click', function () { guard(retryVision); });
 
     $('sample-one').addEventListener('click', function () {
       guard(async function () {
@@ -2029,7 +2239,7 @@ bindMetricTooltip(label, metricKey, metric);
       $('speaker-panel').hidden = true;
       $('ocr-review').hidden = true;
       $('message-count').textContent = '文本变了，请重新辨认';
-      $('redacted-preview').textContent = '';
+      resetPreview();
     });
 
     $('chat-file').addEventListener('change', function () {
@@ -2066,9 +2276,10 @@ bindMetricTooltip(label, metricKey, metric);
         });
         var form = new FormData();
         files.forEach(function (file) { form.append('files', file); });
+        form.append('describe', wantsVisionDescribe('describe-images') ? 'true' : 'false');
         loading(true, files.length > 1
-          ? ['正在读 ' + files.length + ' 张截图…', '把气泡摆回原位…', '接好每一段的缝…']
-          : ['正在读这一长条截图…', '把气泡摆回原位…', '认出说话的人…']);
+          ? ['正在读 ' + files.length + ' 张截图…', '把气泡摆回原位…', '接好每一段的缝…', '等视觉模型看表情与图片…', '表情较多时会慢一些，请稍等…']
+          : ['正在读这一长条截图…', '把气泡摆回原位…', '认出说话的人…', '等视觉模型看表情与图片…', '表情较多时会慢一些，请稍等…']);
         var parsed;
         try {
           parsed = await api('/api/profiles/parse-image', { method: 'POST', body: form });
@@ -2091,6 +2302,26 @@ bindMetricTooltip(label, metricKey, metric);
     });
 
     $('contact-select').addEventListener('change', syncOptions);
+
+    $('toggle-json').addEventListener('click', function () {
+      var pre = $('redacted-json');
+      pre.hidden = !pre.hidden;
+      this.textContent = pre.hidden ? '查看 JSON' : '收起 JSON';
+    });
+
+    $('export-json').addEventListener('click', function () {
+      if (!state.redactedJson) {
+        say('先点「辨认说话的人」生成脱敏预览，再导出 JSON。', true);
+        return;
+      }
+      var url = URL.createObjectURL(new Blob([state.redactedJson], { type: 'application/json;charset=utf-8' }));
+      var link = el('a');
+      link.href = url;
+      link.download = '脱敏聊天记录.json';
+      link.click();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      say('已导出脱敏 JSON（明文文件，请自行保管）。');
+    });
 
     $('create-contact').addEventListener('click', function () {
       guard(async function () {

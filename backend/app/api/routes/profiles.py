@@ -7,18 +7,21 @@
 from __future__ import annotations
 
 import io
+import time
 import zipfile
 from pathlib import Path
 
 import pandas as pd
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from PIL import Image
 
 from app.api.deps import analyzer, get_store
 from app.core import config
 from app.core.errors import call
-from app.schemas import AnalyzeInput, ContactInput, FactEdit, Message
+from app.schemas import AnalyzeInput, ContactInput, DescribeInput, FactEdit, Message
 from app.services import ocr
+from app.services import vision
+from app.services.analyzer import build_ai_payload
 from app.services.profiles import prepare_messages, public_profile
 from app.services.unified import run_unified
 from app.schemas.dossier import ContactDetails, DossierImport, ImportCommit, ManualFact
@@ -178,8 +181,18 @@ def edit_fact(contact_id: str, fact_id: str, body: FactEdit):
 
 @router.post("/preview")
 def preview(body: AnalyzeInput):
+    """脱敏预览：既返回消息列表，也返回将发给云端 AI 的 JSON 文本（所见即所发）。"""
     prepared = call(prepare_messages, [m.model_dump() for m in body.messages], body.self_speaker, body.other_speaker)
-    return {"messages": prepared}
+    records = [{
+        "id": m["id"],
+        "speaker": "自己" if m["role"] == "self" else "对方",
+        "text": m["content"],
+        "emotion": m.get("emotion"),
+        "time": m.get("time"),
+        "time_guessed": m.get("time_guessed"),
+        "kind": m.get("kind"),
+    } for m in prepared]
+    return {"messages": prepared, "ai_payload": build_ai_payload(records)}
 
 
 @router.post("/parse")
@@ -253,16 +266,67 @@ def _load_screenshot(upload: UploadFile, index: int) -> Image.Image:
     return image
 
 
+def _vision_content(kind: str, character: str, summary: str) -> str:
+    """把视觉结果拼成消息内容：表情=主角+情绪，图片=内容概述。"""
+    if kind == "image":
+        return f"[图片：{summary}]" if summary else "[图片]"
+    if character and character not in summary:
+        text = f"{character}，{summary}".strip("，")
+    else:
+        text = summary or character
+    return f"[表情：{text}]" if text else "[表情]"
+
+
+def _describe_visual(messages: list[dict], budget: int, deadline: float) -> tuple[dict[int, dict], int, int, int]:
+    """识别一批表情/图片：自己的 API 并行跑，交大网关串行并守限额。
+
+    返回 (结果, 已处理数, 失败数, 未处理数)，结果按传入下标索引。
+    """
+    targets = messages[:budget]
+    results: dict[int, dict] = {}
+    failed = 0
+    workers = vision.parallel_workers()
+    if workers > 1:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {}
+            for index, message in enumerate(targets):
+                if time.monotonic() >= deadline:
+                    break
+                futures[pool.submit(vision.interpret_data_url, message["image"],
+                                    hint_kind=message["kind"])] = index
+            for future, index in futures.items():
+                try:
+                    results[index] = future.result()
+                except Exception:
+                    failed += 1
+    else:
+        for index, message in enumerate(targets):
+            if time.monotonic() >= deadline:
+                break
+            try:
+                results[index] = vision.interpret_data_url(message["image"], hint_kind=message["kind"])
+            except Exception:
+                failed += 1
+    processed = len(results) + failed
+    skipped = len(messages) - processed
+    return results, processed, failed, skipped
+
+
 @router.post("/parse-image")
 def parse_image(
     file: UploadFile | None = File(default=None),
     files: list[UploadFile] = File(default=[]),
+    describe: bool = Form(default=False),
 ):
     """从一张或多张微信长截图里识别聊天记录，返回带时间/类型元数据的消息列表。
 
     多张按传入顺序拼接，并自动去掉接缝处重复的消息。元数据仅供前端校对与展示，
     提交分析时只取 speaker 与 content，因此不影响任何评分逻辑。OCR 依赖可选，
     未安装时返回 503 而不是让站点崩溃。
+
+    describe=True 且配置了 DEEPSEEK_VISION_MODEL 时，会用多模态模型给表情/图片
+    各写一句内容描述（需要用户明确同意把裁块发给云端）；失败就保留原样。
     """
     uploads = ([file] if file is not None else []) + list(files)
     if not uploads:
@@ -305,7 +369,35 @@ def parse_image(
     if sum(len(m["content"]) for m in messages) > config.MAX_CHARS:
         raise HTTPException(400, "识别出的文字过多，请分几次导入")
 
+    visual_messages = [m for m in messages if m.get("kind") in ("sticker", "image") and m.get("image")]
+    described = 0
+    vision_note = ""
+    if describe and visual_messages:
+        if not vision.available():
+            vision_note = "未配置视觉识别（VISION_API_KEY / VISION_MODEL），表情/图片内容未识别。"
+        else:
+            deadline = time.monotonic() + 420
+            results, processed, failed, skipped = _describe_visual(
+                visual_messages, config.MAX_VISION_IMAGES, deadline)
+            for index, result in results.items():
+                message = visual_messages[index]
+                kind = result["kind"]
+                message["kind"] = kind
+                message["content"] = _vision_content(kind, result["character"], result["summary"])
+                described += 1
+            if described or failed or skipped:
+                vision_note = f"视觉识别：成功 {described} 个"
+                if failed:
+                    vision_note += f"，失败 {failed} 个"
+                if skipped:
+                    vision_note += f"，未处理 {skipped} 个（数量较多，可再导入一次）"
+                vision_note += "（可在校对表中修改）。"
+            else:
+                vision_note = "视觉识别没有成功，表情/图片内容保持原样。"
+
     warning = "表情与图片为版面启发式识别，时间按最近可见的时间分隔推测，请在校对表中核对后再分析。"
+    if vision_note:
+        warning = vision_note + warning
     if len(uploads) > 1:
         seam = f"，并去掉了 {removed} 条接缝重复" if removed else ""
         warning = f"已按选择顺序合并 {len(uploads)} 张截图{seam}。" + warning
@@ -317,6 +409,29 @@ def parse_image(
         "image_count": len(uploads),
         "warning": warning,
     }
+
+
+@router.post("/describe")
+def describe_images(body: DescribeInput):
+    """重新识别一批表情/图片：给导入时没识别成功的条目补一遍（前端「重新识别」按钮用）。"""
+    if not vision.available():
+        raise HTTPException(400, "未配置视觉识别（VISION_API_KEY / VISION_MODEL），无法识别")
+    items = [{"id": item.id, "image": item.image, "kind": item.kind or "sticker"} for item in body.items]
+    deadline = time.monotonic() + 420
+    found, _processed, _failed, skipped = _describe_visual(items, config.MAX_VISION_IMAGES, deadline)
+    attempted = len(items) - skipped
+    results = []
+    for index, item in enumerate(items):
+        if index >= attempted:
+            results.append({"id": item["id"], "error": "本次没处理完，请稍后再点一次"})
+            continue
+        result = found.get(index)
+        if result:
+            results.append({"id": item["id"], "kind": result["kind"],
+                            "content": _vision_content(result["kind"], result["character"], result["summary"])})
+        else:
+            results.append({"id": item["id"], "error": "识别失败，请稍后再试"})
+    return {"results": results}
 
 
 @router.post("/contacts/{contact_id}/analyze")

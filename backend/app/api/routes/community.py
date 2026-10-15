@@ -61,7 +61,11 @@ async def me(authorization: Optional[str] = Header(default=None)):
     if authorization and authorization.lower().startswith("bearer "):
         token = authorization[7:].strip()
     current = get_auth_store().verify(token)
-    return {"username": current}
+    avatar = None
+    if current:
+        info = get_auth_store().get_user_info(current)
+        avatar = info["avatar_type"] if info else None
+    return {"username": current, "avatar_type": avatar}
 
 
 # ------------------------------------------------------------ 榜单（读取）
