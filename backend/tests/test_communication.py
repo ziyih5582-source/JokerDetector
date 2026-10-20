@@ -227,12 +227,15 @@ def test_profile_route_and_default_normal_upload_use_same_engine(client):
     assert result["analysis"]["verdict"]["score"]==legacy["analysis"]["verdict"]["score"]
 
 
-def test_no_plain_preferences_in_new_default(client):
+def test_explicit_preference_can_be_saved_without_generating_advice(client):
     p=client.post("/api/profiles/contacts",json={"name":"小林"}).json()
     data={"messages":[{"speaker":"我","content":"最近看什么？"},{"speaker":"小林","content":"我喜欢咖啡"}],
           "self_speaker":"我","other_speaker":"小林","contact_id":p["id"],"save_consent":True}
     r=client.post("/api/analyze/unified",json=data).json()
-    assert r["profile"]["facts"]==[] and not r["profile_updated"]
+    assert r["profile_updated"]
+    assert r["profile"]["facts"][0]["memory_type"] == "useful_preference"
+    assert r["profile"]["facts"][0]["method"] == ""
+    assert "咖啡" in str(r["profile"]["archive"]["groups"])
 
 
 def test_preview_consent_and_failure_leave_data_untouched(client,monkeypatch):

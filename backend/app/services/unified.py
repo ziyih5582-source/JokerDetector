@@ -76,6 +76,8 @@ def run_unified(
             report_regenerated=duplicate and want_report
             if not use_ai:
                 warning=memory["notice"]
+            elif memory.get("archive_notice"):
+                warning=memory["archive_notice"]
         except HTTPException as exc:
             if exc.status_code==404:
                 raise

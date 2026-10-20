@@ -30,6 +30,31 @@ review_required=true for conflict or a major reversal of relationship stance, bo
 WINDOW_CHARS = 9000
 MAX_WINDOWS = 16
 
+# Keep the shared importer and verification protocol; expand only archive semantics.
+ARCHIVE_V7 = """
+Archive v7 priority: remember useful concrete information, not advice cards. Extract for BOTH self and other.
+Use these additional memory_type values when appropriate:
+special_date: the speaker's birthday or an explicitly meaningful anniversary; keep month/day, original calendar and missing fields. Do not infer age, birth year or romantic anniversary. One explicit statement is enough.
+commitment: who explicitly promised/accepted responsibility for what, deadline and conditions. A suggestion is not a promise. Keep one event_identity per matter.
+An accepted task's concrete scope and priority matter: preserve what to change first, what can wait, and what is explicitly NOT due tonight. Use the responsible speaker's commitment, not a generic interaction_signal; cite the instruction as context and the owner's actual acceptance without manufacturing agreement. A communication-style preference must not replace the concrete task. Keep an unclear deadline unspecified.
+open_loop: a meaningful unanswered invitation, awaiting result or unresolved decision worth continuing later; NOT every question.
+personal_goal: a person's expressed goal and actual stage, not an obligation or an inferred motive.
+shared_experience: a meaningful shared experience or inside reference, with its stated meaning, not automatically a romantic milestone.
+Also retain support_need, current stage_context, specific interests and personal views, conditional speaking patterns and explicit boundaries. A temporary need can matter without becoming a permanent trait. Keep specific names, participation, viewpoints and conditions together; frequency is not 'favourite'.
+For new lifecycle types optionally return item_state=unknown/proposed/pending/agreed/completed/cancelled/result_unknown. Date passed is not proof of completion. Distinguish wish, proposal, acceptance and outcome. For enduring special_date or personal_goal use conditional; for bounded commitment/open_loop use temporary or episode. Stable fact, situated tendency and momentary feeling must remain distinct.
+method and example may be empty for ALL types: do not spend output generating a response strategy. No new single-chat score, attraction percentage or personality diagnosis.
+"""
+EXTRACT += ARCHIVE_V7
+VERIFY += ARCHIVE_V7 + """
+Existing records are read-only reference. Match new lifecycle records by subject and the same matter/event_identity; do not merge unrelated commitments just because both are homework.
+An explicit own correction ('生日我打错了，是...') can update automatically with operation=change and review_required=false; if genuinely inconsistent without a correction or trustworthy order, conflict instead. Different valid situations coexist.
+Verify item_state and event_status against the actual utterances, correcting unsupported state to unknown. Check ownership, negation, quoted fiction, jokes, hypotheticals and AI image annotations before accepting. Never invent a date or a hidden motive.
+Preserve uncertainty in dates: '我查查，好像是12月15号' is NOT a confirmed birthday or a verified lunar-to-Gregorian conversion. Keep '好像/待确认' with the date, do not remove the hedge when refining an existing record or merging topics. A calendar conversion is year-specific; never calculate one yourself.
+"""
+
+UNCERTAIN_DATE = re.compile(r"(?:好像|大概|可能|似乎|记得是|应该是|不确定是不是).{0,8}(?:\d{1,2}\s*月|\d{1,2}\s*[日号]|[一二三四五六七八九十冬腊]+月|初[一二三四五六七八九十])")
+DATE_QUALIFIER = re.compile(r"待(?:核对|确认)|不确定|尚未确认|可能|好像|大概|似乎|应该|记不清")
+
 
 def windows(messages):
     """Keep stable IDs and two adjacent turns across windows; never truncate a turn."""
@@ -95,9 +120,12 @@ def matching_history(profile, candidates, existing):
 
 def focus_messages(chunk):
     """Highlight verbatim personal communication signals; no model-derived summaries."""
-    signals = re.compile(r"不想|喜欢|希望|愿意|(?:^|[，。；！？\s])别|不要|不用|插话|插不上|慢热|看重|介意|不方便|想先|等我|想法变|改观|不是|我(?:在|会|更|想|需要|习惯|不|比较)")
-    selected = [m for m in chunk if m["role"] == "other" and signals.search(m["content"])]
-    return selected[:18] if sum(len(m["content"]) for m in chunk) > 5000 else []
+    signals = re.compile(r"生日|纪念|答应|负责|承诺|结果|考研|报名|比赛|不想|喜欢|希望|愿意|(?:^|[，。；！？\s])别|不要|不用|插话|插不上|慢热|看重|介意|不方便|想先|等我|想法变|改观|不是|我(?:在|会|更|想|需要|习惯|不|比较)")
+    selected = []
+    for role in ("other", "self"):
+        owned = [m for m in chunk if m["role"] == role and signals.search(m["content"])]
+        selected.extend(owned if len(owned) <= 9 else owned[:5] + owned[-4:])
+    return sorted(selected, key=lambda m: m["id"]) if sum(len(m["content"]) for m in chunk) > 5000 else []
 
 
 def extract(messages, profile, client, model, chat_date, scene, validate, existing):
@@ -159,10 +187,27 @@ def extract(messages, profile, client, model, chat_date, scene, validate, existi
             row = {k: v for k, v in candidates[i].items() if k != "last_message_id"}
             for k in ("fact", "scope", "retention", "claim_basis", "interpretation", "alternative", "limitation",
                       "subject", "memory_type", "source_level", "evidence",
-                      "method", "example", "target_id", "operation", "review_required"):
+                      "method", "example", "target_id", "operation", "review_required", "item_state", "event_status"):
                 if k in check:
                     row[k] = check[k]
             row["verification_reason"] = reason[:180]
+            own_date_quotes = [e["quote"] for e in row.get("evidence", []) if any(
+                m["id"] == e.get("message_id") and m["role"] == row.get("subject") for m in chunk)]
+            if (row.get("memory_type") == "special_date" and any(UNCERTAIN_DATE.search(q) for q in own_date_quotes)
+                    and not DATE_QUALIFIER.search(row.get("fact", ""))):
+                rejected.append(row["topic"] + "：推测日期不能写成已经确认的日期")
+                continue
+            # Some models classify one person's explicit acceptance as a
+            # two-person interaction while citing that person only. Preserve
+            # the narrower OWN commitment, never manufacture mutual agreement.
+            own = [e["quote"] for e in row.get("evidence", []) if any(
+                m["id"] == e.get("message_id") and m["role"] == row.get("subject") for m in chunk)]
+            if (row.get("memory_type") == "interaction_signal" and row.get("subject") in {"self", "other"}
+                    and row.get("source_level", "direct") == "direct"
+                    and len(own) == len(row.get("evidence", [])) and own
+                    and any(re.search(r"我(?:明确)?(?:同意|答应)|(?:^|[。！])同意", q) for q in own)
+                    and not any(re.search(r"不同意|未同意|没答应|不答应|如果|假如|[？?]|他说|她说|转发|[“”]", q) for q in own)):
+                row.update(memory_type="commitment", item_state="agreed", event_status="planned", retention="episode")
             if row["retention"] == "pending":
                 # A supported claim is retained only for this episode; future timing
                 # does not make the fact that an instruction was issued unknown.
@@ -176,7 +221,7 @@ def extract(messages, profile, client, model, chat_date, scene, validate, existi
                 target = None
             if target:
                 row["topic"] = target["topic"]
-                if row["memory_type"] == "event":
+                if row["memory_type"] in {"event", "commitment", "open_loop"}:
                     row["event_identity"] = target.get("event_identity", "")
             if row.get("claim_basis") == "inferred":
                 if (row["memory_type"] != "situated_trait" or not all(row.get(k) for k in

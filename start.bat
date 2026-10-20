@@ -12,7 +12,7 @@ set "PYTHONUTF8=1"
 cd /d "%~dp0"
 
 set "PYEXE="
-if exist ".venv\Scripts\python.exe" set "PYEXE=.venv\Scripts\python.exe"
+if exist ".venv\Scripts\python.exe" set "PYEXE=%~dp0.venv\Scripts\python.exe"
 if not defined PYEXE (
   where python >nul 2>&1
   if %errorlevel%==0 set "PYEXE=python"

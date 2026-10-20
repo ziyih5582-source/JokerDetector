@@ -123,3 +123,58 @@ body[data-view="book"] .col-side > .note { display:none; }
 .archive-dialog .line-btn { font-size:.83rem; }
 .archive-dialog .error { color:#a43e35; }
 @media(max-width:900px) { body[data-view="book"] .grid-roster { grid-template-columns:1fr; } .archive-person-head { flex-wrap:wrap; } .archive-portrait,.archive-portrait .campus-section:first-child .campus-grid { grid-template-columns:1fr; } .archive-dialog { width:calc(100vw - 24px); padding:18px; } }
+
+/* V7: two outputs; no extra top-level navigation or required profile forms. */
+.archive-portrait.archive-v7 { display:flex; flex-direction:column; gap:24px; }
+.archive-v7 .archive-profile,.archive-v7 .archive-information { border:1px solid #dce2d7; background:#fff; border-radius:14px; padding:24px; }
+.archive-v7 .archive-profile { background:linear-gradient(120deg,#f0f5ec,#fff 75%); }
+.archive-section-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; }
+.archive-section-head h3 { margin:0; font-size:1.08rem; font-weight:600; color:#334631; }
+.archive-person-switch { display:flex; padding:3px; border-radius:8px; background:#e4eadf; gap:3px; }
+.archive-person-switch button { min-width:48px; border:0; border-radius:6px; background:transparent; padding:6px 12px; font:inherit; font-size:.85rem; cursor:pointer; }
+.archive-person-switch button[aria-pressed="true"] { background:#fff; color:#2d4930; box-shadow:0 1px 5px #24351a13; }
+.archive-summary { margin:0 0 16px; font-size:1.03rem; line-height:1.85; color:#273226; }
+.archive-traits { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 24px; }
+.archive-trait { border-top:1px solid #dfe5da; padding-top:12px; }
+.archive-trait > p { margin:0 0 6px; font-size:.88rem; line-height:1.7; }
+.archive-footnote { margin:16px 0 0; font-size:.75rem; color:#788171; }
+.archive-information-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px 28px; }
+.archive-information-group > h4 { font-size:.8rem; color:#79866f; font-weight:500; margin:0; }
+.archive-information-group .campus-memory h4 { font-size:.95rem; margin:0 0 4px; }
+.archive-information-group .campus-memory > p { font-size:.86rem; line-height:1.75; margin:0; }
+.archive-state { color:#677849; font-size:.76rem!important; margin-top:5px!important; }
+.archive-more { margin-top:18px; border-top:1px solid #e8ebe3; padding-top:14px; }
+.archive-more > summary { font-size:.82rem; color:#69765e; cursor:pointer; }
+.archive-more[open] > .archive-information-grid { margin-top:18px; }
+.archive-v7 blockquote { white-space:pre-wrap; overflow-wrap:anywhere; }
+@media(max-width:900px) { .archive-traits,.archive-information-grid { grid-template-columns:1fr; } .archive-v7 .archive-profile,.archive-v7 .archive-information { padding:18px; } }
+
+/* V8: traits, useful next actions, and consolidated memory on one page. */
+.archive-v8 { gap:20px!important; }
+.archive-v8 .archive-next { border:1px solid #dce2d7; background:#f0f4ec; border-radius:14px; padding:24px; }
+.archive-v8 .archive-next > h3,.archive-v8 .archive-information > h3 { margin:0 0 16px; font-size:1.08rem; color:#334631; }
+.archive-v8 .archive-trait h4,.archive-v8 .archive-topic h4,.archive-v8 .archive-suggestion h4 { margin:0 0 7px; font-size:.98rem; font-weight:600; color:#334631; }
+.archive-v8 .archive-trait > p,.archive-v8 .archive-topic > p,.archive-v8 .archive-suggestion > p { font-size:.89rem; line-height:1.8; margin:0 0 8px; }
+.archive-v8 .archive-next-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr)); gap:18px; }
+.archive-v8 .archive-topic { border-top:1px solid #e2e6de; padding:14px 0 2px; min-width:0; }
+.archive-v8 .archive-suggestion { min-width:0; }
+.archive-v8 .archive-trait,.archive-v8 .archive-topic,.archive-v8 .archive-suggestion { overflow-wrap:anywhere; }
+.archive-v8 .campus-detail { margin-top:8px; }
+.archive-v8 .archive-more > .archive-information-grid { margin-top:16px; }
+@media(max-width:900px) { .archive-v8 .archive-next { padding:18px; } }
+
+/* Personality labels answer what the person is like; stories stay in evidence. */
+.archive-personality-v2 .archive-traits { gap:14px 24px; }
+.archive-personality-v2 .archive-trait { padding-top:14px; }
+.archive-personality-v2 .archive-trait h4 { display:inline-block; border-radius:7px; background:#e5edde; padding:5px 10px; font-size:1rem; margin-bottom:8px; }
+.archive-personality-v2 .archive-trait > p { line-height:1.7; }
+.archive-personality-v2 .archive-trait .campus-detail > summary { color:#7a8374; font-size:.76rem; }
+
+/* Reading comes first; raw import counters are available in archive records. */
+.view[data-view="book"] .tally { display:none; }
+.archive-personality-v2 .archive-trait > p { font-size:.96rem; line-height:1.8; }
+.archive-v8 .archive-topic > p { font-size:.93rem; }
+.archive-personality-v2 .archive-source-edits { margin-top:14px; }
+.archive-personality-v2 .archive-source-edits > summary { font-size:.78rem; color:#7a8374; }
+.archive-v8 .archive-trait:only-child,.archive-v8 .archive-topic:only-child { grid-column:1/-1; }
+.archive-v8 .archive-trait > p { max-width:70ch; }

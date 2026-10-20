@@ -37,6 +37,7 @@ def recognize(store, contact_id, messages, *, revision=None, chat_date=None, sce
 
 
 def import_memory(store, contact_id, messages, **options):
+    portrait_notice = ""
     preview=recognize(store,contact_id,messages,**options)
     if preview.get("token"):
         p=call(communication.commit,store,contact_id,preview["token"])
@@ -45,5 +46,13 @@ def import_memory(store, contact_id, messages, **options):
             p=call(communication.cache_empty,store,contact_id,preview["revision"],preview["empty_metadata"],"ai" if options.get("use_ai") else "local")
         else:
             p=call(store.get,contact_id)
+    before_archive = p["revision"]
+    if options.get("use_ai") and not preview["duplicate"]:
+        from app.services.archive_v8 import rebuild
+        # Empty fact extraction must not suppress inference from the exchange.
+        # A duplicate with a valid portrait remains completely free of model calls.
+        p, portrait_notice = rebuild(store, p, options.get("client"), options.get("model", ""), messages, options.get("chat_date"))
+        if portrait_notice:
+            preview["notice"] += "；" + portrait_notice
     return {"profile":public_profile(p),"changes":preview["changes"],"duplicate":preview["duplicate"],
-            "profile_updated":bool(preview.get("token")),"notice":preview["notice"],"rejected_count":preview["rejected_count"]}
+            "profile_updated":bool(preview.get("token")) or p["revision"] != before_archive,"notice":preview["notice"],"archive_notice":portrait_notice,"rejected_count":preview["rejected_count"]}

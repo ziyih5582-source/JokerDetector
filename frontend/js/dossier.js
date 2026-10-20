@@ -2,7 +2,8 @@
 (function () {
   'use strict';
   var p = null, hooks = null, ready = false, busy = false, editing = null, manualRoles = false, demo = null, ocrRows = null, ocrText = '';
-  var names = { communication_request: '沟通要求', boundary: '边界', support_need: '本次支持需要', situated_trait: '情境特点', shared_understanding: '澄清过的误解', stage_context: '阶段背景', event: '重要事情', useful_preference: '有用偏好', user_note: '用户补充' };
+  var portraitRole = 'other';
+  var names = { communication_request: '沟通要求', boundary: '边界', support_need: '本次支持需要', situated_trait: '情境特点', shared_understanding: '澄清过的误解', stage_context: '阶段背景', event: '重要事情', useful_preference: '有用偏好', user_note: '用户补充', special_date: '生日与特殊日期', commitment: '承诺与分工', open_loop: '尚未结束的事', personal_goal: '目标与计划', shared_experience: '共同经历' };
   var actions = { add: '新增', evidence: '补充依据', refine: '细化理解', branch: '补充场景', change: '更新状态', historical: '补充历史', conflict: '暂待确认', end: '明确结束' };
   Object.assign(names, { relationship_position: '本人关系态度', interaction_signal: '实际互动', personal_view: '个人观点', emotional_state: '当时的心情', useful_preference: '兴趣与喜好' });
   function $(id) { return document.getElementById(id); }
@@ -39,6 +40,11 @@
     if (row.source === '我的补充 / 修正') a.append(el('p', '我的补充 / 修正', 'campus-meta'));
     else if (row.subject === 'self') a.append(el('p', '我的表达', 'campus-meta'));
     a.append(el('h4', row.topic), el('p', row.text));
+    if (row.state_label) a.append(el('p', row.state_label, 'archive-state'));
+    if (row.date_info && row.date_info.month) {
+      var calendar = { gregorian: '公历', lunar: '农历，暂不自动换算', unknown: '历法未确认' }[row.date_info.calendar];
+      a.append(el('p', row.date_info.month + '月' + row.date_info.day + '日 · ' + calendar, 'archive-state'));
+    }
     if (row.source === '旧版摘录，待复核') a.append(el('p', '旧版线索，尚未按新标准复核', 'campus-meta'));
     if (row.historical) a.append(el('p', (row.observed_on || '过去') + '的表达，当前是否仍适用尚不确定。', 'campus-caution'));
     if (row.interpretation) a.append(el('p', '可能的理解：' + row.interpretation, 'campus-caution'));
@@ -95,11 +101,96 @@
     if (events.length) ctx.append(el('h3', '重要事情与已知状态'));
     events.slice(-5).forEach(function (f) { ctx.append(el('p', f.text + (f.event_date ? ' · ' + f.event_date : f.date_text ? ' · 日期原话：' + f.date_text : '') + (f.conflict ? ' · 待确认' : f.validity === 'ended' ? ' · 已明确结束，结果以原话为准' : ' · 没有依据的结果不推测'), 'note')); });
   }
+  function archive(profile) {
+    var data = profile.archive; if (!data) return;
+    var personality = /^personality-v/.test(data.portrait_style || '');
+    if (data.fictional_preview) $('dossier-status').textContent = '预置虚构示例，用于检查页面和更新规则；不代表真实 AI 识别结果。';
+    else if (data.recorded_ai_preview) $('dossier-status').textContent = '虚构聊天的实际 AI 提炼结果，用于预览；不代表真实人物。';
+    $('campus-overview').hidden = true;
+    $('campus-method-heading').hidden = true;
+    $('memory-cards').hidden = true;
+    $('memory-context').hidden = true;
+    var root = $('campus-sections'); root.replaceChildren(); root.classList.add('archive-v7', 'archive-v8');
+    root.classList.toggle('archive-personality-v2', personality);
+    var hero = el('section', undefined, 'archive-profile');
+    var head = el('div', undefined, 'archive-section-head'); head.append(el('h3', '性格与相处画像'));
+    var tabs = el('div', undefined, 'archive-person-switch'); tabs.setAttribute('aria-label', '选择画像人物');
+    ['other', 'self'].forEach(function (role) {
+      var b = el('button', role === 'other' ? 'TA' : '我'); b.type = 'button';
+      b.setAttribute('aria-pressed', String(portraitRole === role)); b.dataset.portraitRole = role;
+      b.addEventListener('click', function () { portraitRole = role; archive(p); }); tabs.append(b);
+    }); head.append(tabs); hero.append(head);
+    var portrait = data.portraits[portraitRole];
+    var panel = el('div', undefined, 'archive-profile-content'); panel.dataset.subject = portraitRole;
+    if (!(portrait.traits || []).length) panel.append(el('p', data.portrait_status === 'needs_refresh' ? '资料已更新。可在加入聊天中重新整理画像，下面的备忘仍可查看。' : '加入聊天后，从表达与互动中逐渐形成特点；材料少时先保留局部认识。', 'archive-summary'));
+    var traits = el('div', undefined, 'archive-traits');
+    (portrait.traits || []).forEach(function (t) {
+      var a = el('article', undefined, 'archive-trait'); if (t.title) a.append(el('h4', t.title)); a.append(el('p', t.text));
+      var d = el('details', undefined, 'campus-detail'); d.append(el('summary', personality ? '为什么这样判断' : '依据与适用情境'));
+      d.append(el('p', t.scope, 'note'), el('p', t.basis_label, 'note'));
+      if (t.alternative) d.append(el('p', '其他可能解释：' + t.alternative, 'note'));
+      if (t.evidence && t.evidence.length) {
+        if (personality) t.evidence.slice(0, 4).forEach(function (e) { var q = el('blockquote', e.quote); q.append(el('p', (e.role === 'self' ? '我' : 'TA') + ' · 第 ' + e.message_number + ' 条', 'note')); d.append(q); });
+        else d.append(evidence(t.evidence));
+      }
+      if (t.counter_evidence && t.counter_evidence.length) { d.append(el('p', '也观察到不同表现，需结合情境：', 'note'), evidence(t.counter_evidence)); }
+      if (t.id) { var dismiss = el('button', '隐藏这条理解', 'campus-edit'); dismiss.type = 'button'; dismiss.addEventListener('click', function () { var id = p.id, revision = p.revision, callback = hooks.onUpdate; run(async function () { await callback(await api(path(id) + '/archive/dismiss', 'POST', { revision: revision, trait_id: t.id })); status('这条理解已隐藏；后续有新材料时可重新评估。'); }); }); d.append(dismiss); }
+      var sourceEdits = personality ? el('details', undefined, 'archive-source-edits') : d;
+      if (personality) sourceEdits.append(el('summary', '修正原始记录'));
+      (t.fact_ids || []).forEach(function (id) {
+        var f = profile.facts.find(function (f) { return f.id === id; }); if (!f) return;
+        if (!personality) sourceEdits.append(el('p', f.text, 'note'));
+        if (f.manual_locked) sourceEdits.append(el('p', '用户补充，不是TA原话。', 'note'));
+        else if (!t.evidence) sourceEdits.append(evidence((f.evidence || []).filter(function (e) { return !e.historical; })));
+        var b = el('button', personality ? '修正：' + f.topic : '修正这条依据', 'campus-edit'); b.type = 'button'; b.addEventListener('click', function () { edit(f); }); sourceEdits.append(b);
+      }); if (personality && sourceEdits.childElementCount > 1) d.append(sourceEdits); a.append(d); traits.append(a);
+    }); panel.append(traits, el('p', personality ? '根据目前聊天推断，可随新记录调整。' : data.analysis_mode === 'excerpts' ? '根据历史摘录形成的初步理解；完整语气和互动仍需新聊天补充。' : data.includes_excerpts ? '结合已提供的互动和历史摘录形成理解；部分历史缺少完整上下文。' : portrait.note, 'archive-footnote')); hero.append(panel); root.append(hero);
+    if (data.topics) {
+      var next = el('section', undefined, 'archive-next'); next.append(el('h3', '接下来怎么聊'));
+      var suggestions = el('div', undefined, 'archive-next-grid');
+      (data.suggestions || []).forEach(function (s) { var card = el('article', undefined, 'archive-suggestion'); card.append(el('h4', s.title), el('p', s.action)); var why = el('details', undefined, 'campus-detail'); why.append(el('summary', '为什么这样建议'), el('p', s.why, 'note')); if ((s.evidence || []).length) why.append(evidence(s.evidence)); card.append(why); suggestions.append(card); });
+      if (!suggestions.childElementCount) suggestions.append(el('p', '暂时没有需要特别跟进的事；不必为聊天安排任务。', 'campus-empty'));
+      next.append(suggestions);
+      var memo = el('section', undefined, 'archive-information'); memo.append(el('h3', '值得记住'));
+      var tiles = el('div', undefined, 'archive-information-grid'), more = el('details', undefined, 'archive-more'); more.append(el('summary', '更多主题与过去的事')); var rest = el('div', undefined, 'archive-information-grid');
+      var shown = 0;
+      (data.topics || []).forEach(function (topic) {
+        var tile = el('article', undefined, 'archive-topic'); tile.dataset.topicId = topic.id;
+        if (topic.subject === 'self') tile.append(el('p', '关于我', 'campus-meta'));
+        tile.append(el('h4', topic.title), el('p', topic.text)); if (topic.state_label) tile.append(el('p', topic.state_label, 'archive-state'));
+        var detail = el('details', undefined, 'campus-detail'); detail.append(el('summary', '查看依据与修正'));
+        if (topic.contains_user_note) detail.append(el('p', '包含你的补充；这部分不是对方原话。', 'note'));
+        if (topic.date_info && topic.date_info.month) detail.append(el('p', topic.date_info.month + '月' + topic.date_info.day + '日 · ' + ({ gregorian: '公历', lunar: '农历', unknown: '历法待确认' }[topic.date_info.calendar]), 'note'));
+        if (topic.historical) detail.append(el('p', '来自过去或日期未确认的记录，不代表当前安排。', 'note'));
+        if ((topic.evidence || []).length) detail.append(evidence(topic.evidence));
+        (topic.versions || []).slice(-3).forEach(function (v) { detail.append(el('p', (v.reason === 'confirmed_archive_keep' ? '本次未采用的记录' : '之前的记录') + (v.observed_on ? '（' + v.observed_on + '）' : '') + '：' + v.text, 'note')); });
+        (topic.fact_ids || []).forEach(function (fid) { var fact = profile.facts.find(function (f) { return f.id === fid; }); if (!fact) return; var button = el('button', '修正：' + fact.topic, 'campus-edit'); button.type = 'button'; button.addEventListener('click', function () { edit(fact); }); detail.append(button); }); tile.append(detail);
+        if (shown < 6 && topic.priority !== 'minor' && !topic.historical) { tiles.append(tile); shown++; } else rest.append(tile);
+      });
+      if (!shown) tiles.append(el('p', data.topics.length ? '已有信息保留在更多主题中，暂未列为当前重点。' : '值得记住的兴趣、边界和重要事项会逐渐汇集在这里。', 'campus-empty'));
+      memo.append(tiles); if (rest.childElementCount) { more.append(rest); memo.append(more); } root.append(memo); if ((data.suggestions || []).length) root.append(next); return;
+    }
+    var information = el('section', undefined, 'archive-information');
+    var infoHead = el('div', undefined, 'archive-section-head'); infoHead.append(el('h3', '值得记住的事'), el('span', data.coverage.items + ' 条记录', 'note')); information.append(infoHead);
+    var grid = el('div', undefined, 'archive-information-grid'), extra = el('details', undefined, 'archive-more');
+    extra.append(el('summary', '展开其余信息与过去的事项')); var extraBody = el('div', undefined, 'archive-information-grid'); var extraCount = 0;
+    (data.groups || []).forEach(function (g) {
+      var active = g.items.filter(function (r) { return !r.historical && !['completed', 'cancelled'].includes(r.item_state); });
+      var primary = ['interests', 'boundaries', 'ongoing', 'dates'].includes(g.id) ? active.slice(0, g.id === 'ongoing' ? 3 : 2) : [];
+      function group(items, target) { if (!items.length) return; var s = el('section', undefined, 'archive-information-group'); s.dataset.group = g.id; s.append(el('h4', g.title)); items.forEach(function (r) { s.append(memoryTile(r)); }); target.append(s); }
+      group(primary, grid); var rest = g.items.filter(function (r) { return !primary.includes(r); });
+      extraCount += rest.length; group(rest, extraBody);
+    });
+    if (!data.groups.length) information.append(el('p', '加入一段聊天，先留下具体兴趣、明确需要和值得接续的事；不必填满资料。', 'campus-empty'));
+    information.append(grid); if (extraCount) { extra.append(extraBody); information.append(extra); }
+    root.append(information);
+  }
   function records(profile) {
     var box = $('dossier-groups'); box.replaceChildren();
     profile.facts.forEach(function (f) {
       var a = el('article', undefined, 'fact' + (f.conflict ? ' conflict' : ''));
       a.append(el('div', (names[f.memory_type] || (f.origin === 'manual' ? '用户补充' : '旧版资料')) + ' · ' + (f.manual_locked ? '用户补充 / 修正' : f.source_level === 'interaction' ? '双方互动' : '原话记录') + (f.conflict || f.retention === 'pending' ? ' · 待确认' : '') + (f.retention === 'temporary' ? ' · 限本次或阶段' : ''), 'dossier-tags'));
+      if (f.validity === 'superseded') a.append(el('p', '历史记录，已按较新的表达更新', 'campus-meta'));
       a.append(el('h4', f.topic + '：' + f.text)); if (f.context) a.append(el('p', '范围：' + f.context, 'note')); if (f.interpretation) a.append(el('p', '可能的理解：' + f.interpretation, 'note'));
       a.append(evidence(f.evidence || [], f.versions)); (f.branches || []).forEach(function (b) { a.append(el('p', '另一个条件：' + b.scope + ' · ' + b.fact, 'note')); });
       (f.alternatives || []).forEach(function (v) { a.append(el('p', '另一种说法：' + v.text + ' · ' + (v.observed_on || '时间未确认'), 'note')); });
@@ -119,7 +210,7 @@
     $('memory-speakers').textContent = '本段发言者：' + $('dossier-self').value + ' / ' + $('dossier-other').value + ' · 日期不明可留空';
   }
   function input() { var rows = textRows(); speakers(rows); var original = ocrRows && $('dossier-chat').value === ocrText; if (original) rows = ocrRows; return { revision: p.revision, messages: rows, self_speaker: $('dossier-self').value.trim(), other_speaker: $('dossier-other').value.trim(), chat_date: $('dossier-chat-date').value || null, scene: $('dossier-scene').value.trim(), source_kind: original ? 'ocr' : 'chat', time_reliability: original || $('dossier-chat-date').value ? 'confirmed' : 'unknown', use_ai: $('dossier-ai').checked, cloud_consent: $('memory-consent').checked, save_consent: $('memory-consent').checked }; }
-  function consent() { $('memory-consent-text').textContent = $('dossier-ai').checked ? '我已核对双方、聊天文字与日期线索，同意发送脱敏聊天和必要背景到当前 AI 服务，并保存有用信息与短依据' : '我已核对双方、聊天文字与日期线索，同意保存本次有用信息与脱敏依据（本地规则能力有限）'; }
+  function consent() { $('memory-consent-text').textContent = $('dossier-ai').checked ? '我已核对双方与文字，同意将脱敏聊天和必要历史依据发送到当前 AI 服务，并在本机加密保存要点与必要互动片段' : '我已核对双方、聊天文字与日期线索，同意保存本次有用信息与脱敏依据（本地规则能力有限）'; }
   function clearNote() { editing = null; $('memory-note-form').reset(); $('memory-note-target').textContent = '这是你的补充，会与对方原话区分。'; }
   function init() {
     if (ready) return; ready = true;
@@ -142,10 +233,11 @@
     $('memory-run').addEventListener('click', function () { run(async function () { var id = p.id, callback = hooks.onUpdate, data = input(); if (!data.save_consent) throw new Error('先核对双方并勾选本次使用确认'); status(data.use_ai ? 'AI正在理解双方互动，检查哪些信息值得留下……' : '正在摘录明确表达……'); var r = await api(path(id) + '/memory/import', 'POST', data); await callback(r.profile); if (!p || p.id !== id) return; var box = $('memory-update'); box.replaceChildren(); if (r.duplicate) box.append(el('p', '这段已处理，没有重复调用或计数。', 'note')); else if (!r.changes.length) box.append(el('p', '本次没有值得新增的信息，原有内容保持。', 'note')); else r.changes.slice(0, 6).forEach(function (c) { box.append(el('p', (actions[c.action] || '更新') + '：' + c.text + ' · ' + c.reason, 'note')); }); status(r.notice + (r.rejected_count ? ' · 有 ' + r.rejected_count + ' 项未通过校验。' : '')); }); });
     $('dossier-redact').addEventListener('click', function () { run(async function () { var id = p.id, data = input(); delete data.save_consent; delete data.source_kind; delete data.time_reliability; data.messages = data.messages.map(function (m) { return { speaker: m.speaker, content: m.content }; }); var r = await api(path(id) + '/imports/redact', 'POST', data); if (p.id !== id) return; $('dossier-redacted').textContent = r.messages.map(function (m) { return (m.role === 'self' ? '自己' : '对方') + '：' + m.content; }).join('\n'); $('dossier-redacted').hidden = false; status('请核对敏感细节，基础遮盖不能识别所有隐私。'); }); });
     $('memory-note-reset').addEventListener('click', clearNote);
+    $('archive-rebuild').addEventListener('click', function () { if (!$('dossier-ai').checked || !$('memory-consent').checked) { status('请开启云端AI并勾选发送与保存确认；这次仅使用已有脱敏依据。', true); return; } var id = p.id, revision = p.revision, callback = hooks.onUpdate; run(async function () { status('正在结合已有互动重新整理，请稍候……'); var r = await api(path(id) + '/archive/rebuild', 'POST', { revision: revision, cloud_consent: true, save_consent: true }); await callback(r.profile); if (p.id === id) { $('archive-upload-dialog').close(); status(r.notice); } }); });
     $('memory-note-form').addEventListener('submit', function (e) { e.preventDefault(); var id = p.id, callback = hooks.onUpdate, data = { revision: p.revision, fact_id: editing, text: $('memory-note').value.trim(), use_in_ai: $('memory-note-ai').checked }; run(async function () { await callback(await api(path(id) + '/memory/notes', 'POST', data)); if (p.id !== id) return; clearNote(); $('archive-tools-dialog').close(); status('补充已保存，相关旧方法已停用；后续导入不会自动改写你的认识。'); }); });
     $('dossier-contact-form').addEventListener('submit', function (e) { e.preventDefault(); var id = p.id, callback = hooks.onUpdate, data = { revision: p.revision, name: $('dossier-name').value.trim(), relationship_tags: $('dossier-tags').value.split(/[,，、]/).map(function (x) { return x.trim(); }).filter(Boolean), background: $('dossier-background').value }; run(async function () { await callback(await api(path(id), 'PATCH', data)); if (p.id === id) status('可选资料已保存。'); }); });
     [['dossier-excel', '/api/profiles/parse'], ['dossier-images', '/api/profiles/parse-image']].forEach(function (pair) { $(pair[0]).addEventListener('change', function () { var files = Array.from(this.files); if (!files.length) return; run(async function () { var id = p.id, form = new FormData(); files.forEach(function (f) { form.append(pair[0] === 'dossier-excel' ? 'file' : 'files', f); }); status('正在读取聊天，请稍后校对……'); var r = await api(pair[1], 'POST', form); if (p.id !== id) return; manualRoles = false; ocrRows = pair[0] === 'dossier-images' ? r.messages.map(function (m) { return { speaker: m.speaker, content: m.content, time: m.time || null, time_guessed: !!m.time_guessed, kind: m.kind || 'text' }; }) : null; $('dossier-chat').value = r.messages.map(function (m) { return m.speaker + '：' + m.content; }).join('\n'); ocrText = $('dossier-chat').value; var dates = Array.from(new Set(r.messages.map(function (m) { var t = (m.time || '').match(/^\d{1,2}\/\d{1,2}\/(?:20\d{2}|\d{2})/); return t ? t[0] : ''; }).filter(Boolean))); $('archive-ocr-dates').hidden = !dates.length; $('archive-ocr-dates').textContent = '截图中的日期线索：' + dates.join('、') + '。请对照原图核对；统一日期留空时会使用这些线索。'; speakers(r.messages); $('memory-input-details').open = true; status((r.warning || '已读入。') + ' 请核对双方、文字与日期。'); $(pair[0]).value = ''; }); }); });
     api('/api/health').then(function (r) { $('dossier-ai').checked = !!r.ai_available; consent(); }).catch(consent);
   }
-  window.ProfileEditor = { render: function (profile, callbacks) { init(); hooks = callbacks; var changed = !p || !profile || p.id !== profile.id; p = profile; if (!p) return; if (changed) { manualRoles = false; ocrRows = null; ocrText = ''; $('archive-ocr-dates').hidden = true; $('dossier-chat').value = ''; $('dossier-self').value = '我'; $('dossier-other').value = p.name; $('dossier-chat-date').value = ''; $('dossier-scene').value = ''; $('memory-consent').checked = false; $('memory-update').replaceChildren(); $('dossier-redacted').hidden = true; clearNote(); status(''); } $('dossier-name').value = p.name; $('dossier-tags').value = (p.relationship_tags || []).join('，'); $('dossier-background').value = p.background || ''; campus(p); cards(p); records(p); consent(); } };
+  window.ProfileEditor = { render: function (profile, callbacks) { init(); hooks = callbacks; var changed = !p || !profile || p.id !== profile.id; p = profile; if (!p) return; if (changed) { portraitRole = 'other'; manualRoles = false; ocrRows = null; ocrText = ''; $('archive-ocr-dates').hidden = true; $('dossier-chat').value = ''; $('dossier-self').value = '我'; $('dossier-other').value = p.name; $('dossier-chat-date').value = ''; $('dossier-scene').value = ''; $('memory-consent').checked = false; $('memory-update').replaceChildren(); $('dossier-redacted').hidden = true; clearNote(); status(''); } $('dossier-name').value = p.name; $('dossier-tags').value = (p.relationship_tags || []).join('，'); $('dossier-background').value = p.background || ''; campus(p); cards(p); archive(p); records(p); consent(); } };
 }());

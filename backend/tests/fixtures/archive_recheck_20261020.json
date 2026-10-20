@@ -1,0 +1,834 @@
+{
+  "notice": "虚构开发用例，无真人聊天、无人格金标准；不表示每条均已完成云端核验，完成情况见开发报告。",
+  "cases": [
+    {
+      "id": "v01_separate_fandom_owners",
+      "family": "v01_separate_fandom_owners",
+      "area": "interests",
+      "kind": "new_independent",
+      "rich": true,
+      "provenance": "new fictional regression; frozen 2026-10-20 before requests",
+      "steps": [
+        {
+          "day": "2026-10-11",
+          "messages": [
+            {
+              "role": "self",
+              "content": "我只看《桥上行人》的画风，没参加线下。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "我追《潮间记》里的林澄和许遥这对CP，线下会交换我自己做的小卡。",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "我最近画的是《桥上行人》的风景，不是人物。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "我画林澄和许遥的互动。我嗑的是角色和同人，不是演员本人。",
+              "kind": "text"
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "memory",
+          "pattern": "潮间记",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        },
+        {
+          "kind": "memory",
+          "pattern": "桥上行人",
+          "role": "self",
+          "why": "manual semantic review, not personality ground truth"
+        }
+      ]
+    },
+    {
+      "id": "v02_unconfirmed_solar_date",
+      "family": "v02_unconfirmed_solar_date",
+      "area": "everyday",
+      "kind": "new_independent",
+      "rich": false,
+      "provenance": "new fictional regression; frozen 2026-10-20 before requests",
+      "steps": [
+        {
+          "day": "2026-10-11",
+          "messages": [
+            {
+              "role": "self",
+              "content": "你的生日是农历九月初三吧？",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "对，农历九月初三。",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "那今年阳历哪天？",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "我查查，好像是10月23号，还没核对。",
+              "kind": "text"
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "memory",
+          "pattern": "农历|九月|初三",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        }
+      ]
+    },
+    {
+      "id": "v03_two_people_birthdays",
+      "family": "v03_two_people_birthdays",
+      "area": "everyday",
+      "kind": "new_independent",
+      "rich": false,
+      "provenance": "new fictional regression; frozen 2026-10-20 before requests",
+      "steps": [
+        {
+          "day": "2026-10-11",
+          "messages": [
+            {
+              "role": "self",
+              "content": "我的生日是公历10月11号。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "我自己是农历八月十六，我朋友才是10月11号。",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "那各自记自己的历法。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "嗯，别给我换成公历10月11。",
+              "kind": "text"
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "memory",
+          "pattern": "10月11|10-11",
+          "role": "self",
+          "why": "manual semantic review, not personality ground truth"
+        },
+        {
+          "kind": "memory",
+          "pattern": "八月十六|8月16",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        }
+      ]
+    },
+    {
+      "id": "v04_group_permission_not_private",
+      "family": "v04_group_permission_not_private",
+      "area": "romance",
+      "kind": "new_continuity",
+      "rich": false,
+      "provenance": "new fictional regression; frozen 2026-10-20 before requests",
+      "steps": [
+        {
+          "day": "2026-10-11",
+          "messages": [
+            {
+              "role": "self",
+              "content": "周末单独吃饭？",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "我不想单独约会，班级聚餐另说。",
+              "kind": "text"
+            }
+          ]
+        },
+        {
+          "day": "2026-10-16",
+          "messages": [
+            {
+              "role": "self",
+              "content": "这次班里六个人一起聚餐呢？",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "六个人聚餐我同意，还是不单独约会。",
+              "kind": "text"
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "memory",
+          "pattern": "不.*单独|不想.*约会",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        },
+        {
+          "kind": "no_action",
+          "pattern": "安排.*单独|单独.*约出来",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        }
+      ]
+    },
+    {
+      "id": "v05_small_joke_repair",
+      "family": "v05_small_joke_repair",
+      "area": "everyday",
+      "kind": "new_independent",
+      "rich": true,
+      "provenance": "new fictional regression; frozen 2026-10-20 before requests",
+      "steps": [
+        {
+          "day": "2026-10-11",
+          "messages": [
+            {
+              "role": "self",
+              "content": "我今天写代码把自己绕成毛线球了。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "毛线球还会自己打结，你这技能挺全。",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "有点扎心。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "哎我玩笑开过头了，对不起。你是想吐槽还是要一起找bug？",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "先吐槽两分钟。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "行，我收起螺丝刀，先当听众。",
+              "kind": "text"
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "no_trait",
+          "pattern": "天生外向|永远乐观|讨好型",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        }
+      ]
+    },
+    {
+      "id": "v06_own_task_not_other",
+      "family": "v06_own_task_not_other",
+      "area": "coordination",
+      "kind": "new_independent",
+      "rich": false,
+      "provenance": "new fictional regression; frozen 2026-10-20 before requests",
+      "steps": [
+        {
+          "day": "2026-10-11",
+          "messages": [
+            {
+              "role": "other",
+              "content": "你先改横轴范围，图注下次再改，不用今晚全重做。",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "收到，我先把横轴校对好。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "有不确定的直接问我，不用猜答案。",
+              "kind": "text"
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "memory",
+          "pattern": "横轴",
+          "role": "self",
+          "why": "manual semantic review, not personality ground truth"
+        },
+        {
+          "kind": "memory",
+          "pattern": "直接问|不用猜",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        }
+      ]
+    },
+    {
+      "id": "v07_question_not_acceptance",
+      "family": "v07_question_not_acceptance",
+      "area": "romance",
+      "kind": "new_independent",
+      "rich": false,
+      "provenance": "new fictional regression; frozen 2026-10-20 before requests",
+      "steps": [
+        {
+          "day": "2026-10-11",
+          "messages": [
+            {
+              "role": "self",
+              "content": "周六去展览，就这么定了？",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "你已经答应别人一起去了吗？",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "我还没问。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "那你先问清楚，我这边也没法确定。",
+              "kind": "text"
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "no_action",
+          "pattern": "周六.*见面|周六.*赴约",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        }
+      ]
+    },
+    {
+      "id": "v08_result_still_unknown",
+      "family": "v08_result_still_unknown",
+      "area": "everyday",
+      "kind": "new_continuity",
+      "rich": false,
+      "provenance": "new fictional regression; frozen 2026-10-20 before requests",
+      "steps": [
+        {
+          "day": "2026-10-11",
+          "messages": [
+            {
+              "role": "other",
+              "content": "我周五去面试，周末等结果。",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "那周末我问问。",
+              "kind": "text"
+            }
+          ]
+        },
+        {
+          "day": "2026-10-16",
+          "messages": [
+            {
+              "role": "self",
+              "content": "出结果了吗？",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "还没，邮件也没来，先别替我庆祝。",
+              "kind": "text"
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "memory",
+          "pattern": "没|未|等待|等结果",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        },
+        {
+          "kind": "no_action",
+          "pattern": "庆祝.*录用|恭喜.*通过",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        }
+      ]
+    },
+    {
+      "id": "v09_stale_upload_order",
+      "family": "v09_stale_upload_order",
+      "area": "everyday",
+      "kind": "new_continuity",
+      "rich": false,
+      "provenance": "new fictional regression; frozen 2026-10-20 before requests",
+      "steps": [
+        {
+          "day": "2026-10-11",
+          "messages": [
+            {
+              "role": "other",
+              "content": "之前说晚饭后电话不方便，现在晚八点以后可以，先发消息问我。",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "好，先文字问。",
+              "kind": "text"
+            }
+          ]
+        },
+        {
+          "day": "2026-10-08",
+          "messages": [
+            {
+              "role": "other",
+              "content": "这条是早几天的：我最近晚饭后都不方便电话。",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "收到。",
+              "kind": "text"
+            }
+          ]
+        }
+      ],
+      "checks": []
+    },
+    {
+      "id": "v10_elder_hobby_no_stereotype",
+      "family": "v10_elder_hobby_no_stereotype",
+      "area": "intergenerational",
+      "kind": "new_independent",
+      "rich": true,
+      "provenance": "new fictional regression; frozen 2026-10-20 before requests",
+      "steps": [
+        {
+          "day": "2026-10-11",
+          "messages": [
+            {
+              "role": "self",
+              "content": "老师，我以为您不玩游戏。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "我也玩策略游戏，但不太打排位，慢慢琢磨比较有意思。",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "我卡关了，要不您帮我打完。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "我可以听听你怎么想，不替你选。你先讲讲卡在哪一步。",
+              "kind": "text"
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "memory",
+          "pattern": "策略|游戏",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        },
+        {
+          "kind": "no_trait",
+          "pattern": "固执保守|不懂年轻人",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        }
+      ]
+    },
+    {
+      "id": "v11_public_and_private",
+      "family": "v11_public_and_private",
+      "area": "everyday",
+      "kind": "new_independent",
+      "rich": true,
+      "provenance": "new fictional regression; frozen 2026-10-20 before requests",
+      "steps": [
+        {
+          "day": "2026-10-11",
+          "messages": [
+            {
+              "role": "self",
+              "content": "班群里怎么都不说话。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "人多时我一般先看，怕突然插进去打断别人。",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "但私聊你会讲好多。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "熟悉的人我比较放松，也愿意展开聊。你有不一样的想法可以直接说。",
+              "kind": "text"
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "no_trait",
+          "pattern": "不喜欢你|冷漠|社恐症",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        }
+      ]
+    },
+    {
+      "id": "v12_anniversary_is_unilateral",
+      "family": "v12_anniversary_is_unilateral",
+      "area": "romance",
+      "kind": "new_independent",
+      "rich": false,
+      "provenance": "new fictional regression; frozen 2026-10-20 before requests",
+      "steps": [
+        {
+          "day": "2026-10-11",
+          "messages": [
+            {
+              "role": "self",
+              "content": "今天是我第一次加你微信满一百天，我想当纪念日。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "我知道你在意，不过我没有把这个当共同纪念日，也没有答应恋爱。",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "明白，尊重你的想法。",
+              "kind": "text"
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "memory",
+          "pattern": "没有.*共同|没有.*恋爱|不.*共同",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        },
+        {
+          "kind": "no_action",
+          "pattern": "庆祝.*恋爱|共同.*周年",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        }
+      ]
+    },
+    {
+      "id": "v13_one_slow_reply",
+      "family": "v13_one_slow_reply",
+      "area": "everyday",
+      "kind": "new_independent",
+      "rich": false,
+      "provenance": "new fictional regression; frozen 2026-10-20 before requests",
+      "steps": [
+        {
+          "day": "2026-10-11",
+          "messages": [
+            {
+              "role": "self",
+              "content": "怎么隔一天才回。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "昨天实验室没信号，晚上我直接睡着了。",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "我以为你生气了。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "没有生气。我看到了你说的那个社团项目，第二部分好像漏了样本来源。",
+              "kind": "text"
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "no_trait",
+          "pattern": "懒散|冷漠|不在乎你",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        }
+      ]
+    },
+    {
+      "id": "v14_disagreement_with_reasons",
+      "family": "v14_disagreement_with_reasons",
+      "area": "interests",
+      "kind": "new_independent",
+      "rich": true,
+      "provenance": "new fictional regression; frozen 2026-10-20 before requests",
+      "steps": [
+        {
+          "day": "2026-10-11",
+          "messages": [
+            {
+              "role": "self",
+              "content": "结尾两个人在一起才算好作品吧。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "我不这么想，人物决定如果站不住，强行在一起也会很别扭。",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "我觉得你有点悲观。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "可以不同意，我讲的是这部作品的逻辑，不是反对现实恋爱。你觉得哪一段最能支持这个结尾？",
+              "kind": "text"
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "no_trait",
+          "pattern": "不信任爱情|回避型|悲观人格",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        }
+      ]
+    },
+    {
+      "id": "v15_cancelled_specific_task",
+      "family": "v15_cancelled_specific_task",
+      "area": "coordination",
+      "kind": "new_continuity",
+      "rich": false,
+      "provenance": "new fictional regression; frozen 2026-10-20 before requests",
+      "steps": [
+        {
+          "day": "2026-10-11",
+          "messages": [
+            {
+              "role": "other",
+              "content": "我答应10月22日交问卷封面，海报是你的。",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "海报我来。",
+              "kind": "text"
+            }
+          ]
+        },
+        {
+          "day": "2026-10-16",
+          "messages": [
+            {
+              "role": "other",
+              "content": "问卷项目取消了，封面不用交，不是已经完成；海报没取消。",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "明白，我的海报继续。",
+              "kind": "text"
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "no_action",
+          "pattern": "催.*封面|跟进.*封面",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        }
+      ]
+    },
+    {
+      "id": "v16_date_explicit_correction",
+      "family": "v16_date_explicit_correction",
+      "area": "everyday",
+      "kind": "new_continuity",
+      "rich": false,
+      "provenance": "new fictional regression; frozen 2026-10-20 before requests",
+      "steps": [
+        {
+          "day": "2026-10-11",
+          "messages": [
+            {
+              "role": "other",
+              "content": "我生日公历12月15号。",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "记下了。",
+              "kind": "text"
+            }
+          ]
+        },
+        {
+          "day": "2026-10-16",
+          "messages": [
+            {
+              "role": "other",
+              "content": "我上次打错了，公历生日是12月25号，不是15号。",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "这次改对。",
+              "kind": "text"
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "memory",
+          "pattern": "12月25|12-25",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        }
+      ]
+    },
+    {
+      "id": "v17_quoted_instruction_not_personality",
+      "family": "v17_quoted_instruction_not_personality",
+      "area": "everyday",
+      "kind": "new_independent",
+      "rich": true,
+      "provenance": "new fictional regression; frozen 2026-10-20 before requests",
+      "steps": [
+        {
+          "day": "2026-10-11",
+          "messages": [
+            {
+              "role": "self",
+              "content": "群里有人说先把一个人写成操控型人格就能吓住。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "那是转发的话，我不认同。咱们讨论问题别给人扣这种帽子。",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "那就说具体事情。",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "对，哪句话让你不舒服就讲哪句，也给别人解释的机会。",
+              "kind": "text"
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "no_trait",
+          "pattern": "操控型人格|人格障碍",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        }
+      ]
+    },
+    {
+      "id": "v18_no_followup_result_fabrication",
+      "family": "v18_no_followup_result_fabrication",
+      "area": "romance",
+      "kind": "new_independent",
+      "rich": false,
+      "provenance": "new fictional regression; frozen 2026-10-20 before requests",
+      "steps": [
+        {
+          "day": "2026-10-11",
+          "messages": [
+            {
+              "role": "self",
+              "content": "周日聚餐我先占一个位，你愿意来吗？",
+              "kind": "text"
+            },
+            {
+              "role": "other",
+              "content": "我得等实验排期，没法先答应。",
+              "kind": "text"
+            },
+            {
+              "role": "self",
+              "content": "先看排期，不给你算确认。",
+              "kind": "text"
+            }
+          ]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "no_action",
+          "pattern": "提醒.*准时|准备.*赴约",
+          "role": "other",
+          "why": "manual semantic review, not personality ground truth"
+        }
+      ]
+    }
+  ]
+}
