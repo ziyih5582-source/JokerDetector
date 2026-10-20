@@ -1,4 +1,4 @@
-"""Local contact dossiers. Raw conversations are request-scoped, never persisted here."""
+"""Local dossiers. Consented redacted evidence excerpts are encrypted at rest."""
 import hashlib
 import hmac
 import json
@@ -252,6 +252,8 @@ class ProfileStore:
         from app.services.communication import migrate as migrate_memory
         migrate(profile)
         migrate_memory(profile)
+        from app.services.archive_v8 import prune
+        prune(profile)
         payload = self.cipher.encrypt(json.dumps(profile, ensure_ascii=False).encode())
         db.execute("INSERT OR REPLACE INTO contacts VALUES (?,?)", (profile["id"], payload))
 
@@ -411,6 +413,10 @@ def public_profile(profile):
             e.pop("source_session",None)
     from app.services.campus import board_for
     copy["campus_board"] = board_for(copy)
+    from app.services.archive_v8 import build
+    copy["archive"] = build(copy, profile)
+    copy.pop("archive_portraits", None)
+    copy.pop("archive_v8", None)
     copy["memory_summary"] = {"engine":PROMPT_VERSION, "records":sum(f.get("memory_version")==3 for f in copy["facts"]),
                               "cards":len(copy["method_cards"]), "legacy_records":sum(f.get("memory_version")!=3 for f in copy["facts"])}
     return copy

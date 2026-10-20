@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """联系人档案接口：名册增删、条目人工修正、Excel 解析与预览。
 
-档案只存在本机（`data/private/`，脱敏后加密），不随聊天原文一起落盘。
+档案只存在本机（默认 `data/private/`）。完整聊天不在此持久化；经同意的脱敏原话片段会加密留作核查依据。
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ from app.services.unified import run_unified
 from app.schemas.dossier import ContactDetails, DossierImport, ImportCommit, ManualFact
 from app.services import dossier
 from app.services.profiles import ai_error_detail
+from app.schemas.communication import ArchiveRebuild, ArchiveDismiss
 from app.schemas.communication import MemoryCommit, MemoryImport, MemoryNote, MemoryResolution
 from app.services import communication
 from app.services.communication_flow import import_memory, recognize
@@ -97,6 +98,26 @@ def update_memory(contact_id: str, body: MemoryImport):
 @router.post("/contacts/{contact_id}/memory/notes")
 def memory_note(contact_id: str, body: MemoryNote):
     return public_profile(call(communication.save_note,get_store(),contact_id,body.revision,body.text,body.fact_id,body.use_in_ai))
+
+
+@router.post("/contacts/{contact_id}/archive/rebuild")
+def rebuild_archive(contact_id: str, body: ArchiveRebuild):
+    if not body.cloud_consent or not body.save_consent:
+        raise HTTPException(400, "请确认将已有脱敏依据交给当前云端AI，并保存整理结果")
+    if not analyzer.client:
+        raise HTTPException(400, "尚未配置云端AI")
+    from app.services.archive_v8 import rebuild
+    store = get_store()
+    p = call(store.get, contact_id)
+    call(dossier.check_revision, p, body.revision)
+    p, notice = rebuild(store, p, analyzer.client, analyzer.ai_model)
+    return {"profile": public_profile(p), "notice": notice or "已重新整理；历史摘录不等于完整聊天，后续上传可继续完善。"}
+
+
+@router.post("/contacts/{contact_id}/archive/dismiss")
+def dismiss_archive_trait(contact_id: str, body: ArchiveDismiss):
+    from app.services.archive_v8 import dismiss_trait
+    return public_profile(call(dismiss_trait, get_store(), contact_id, body.revision, body.trait_id))
 
 
 @router.post("/contacts/{contact_id}/memory/{fact_id}/resolve")

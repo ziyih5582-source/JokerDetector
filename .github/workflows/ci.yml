@@ -17,6 +17,7 @@ jobs:
         run: |
           node --check frontend/js/speech.js
           node --check frontend/js/ink.js
+          node --check frontend/js/dossier.js
           node --check frontend/js/clown-board.js
       - name: 朗读状态与长文测试
         run: node --test frontend/tests/speech.test.cjs

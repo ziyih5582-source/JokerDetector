@@ -1,7 +1,7 @@
 """Grounded communication recognition: evidence, conditional memory and methods.
 
 The model proposes meaning; code enforces references, scope, dates, identity,
-manual constraints and atomic revision checks. No raw transcript is persisted.
+manual constraints and atomic revision checks. Consented excerpts are retained in the encrypted archive evidence bank.
 """
 import copy
 import json
@@ -16,8 +16,8 @@ from app.schemas.communication import Candidate
 from app.services.dossier import check_revision, import_metadata, save, topic_key
 from app.services.profiles import SENSITIVE, normalize, now, redact
 
-PROMPT_VERSION = "archive-evidence-v6.1"
-POLICY_VERSION = "archive-guards-v6.1"
+PROMPT_VERSION = "archive-evidence-v8.3"
+POLICY_VERSION = "archive-guards-v8.4"
 TYPES = {
     "communication_request": "沟通要求", "boundary": "边界", "support_need": "支持需要",
     "situated_trait": "情境特点", "shared_understanding": "共同理解与澄清",
@@ -25,16 +25,21 @@ TYPES = {
     "user_note": "用户补充",
     "relationship_position": "本人关系态度", "interaction_signal": "关系中的实际互动",
     "personal_view": "兴趣与个人观点", "emotional_state": "当时的心情",
+    "special_date": "生日与特殊日期", "commitment": "承诺与分工", "open_loop": "尚未结束的事",
+    "personal_goal": "目标与计划", "shared_experience": "共同经历",
 }
 CATEGORY = {"communication_request": "style", "boundary": "boundary", "support_need": "value",
             "situated_trait": "trait", "shared_understanding": "style", "stage_context": "event",
             "event": "event", "useful_preference": "preference", "relationship_position": "value",
             "interaction_signal": "style", "personal_view": "value", "emotional_state": "event"}
+CATEGORY.update(special_date="event", commitment="event", open_loop="event",
+                personal_goal="value", shared_experience="event")
+TIMED_TYPES = {"event", "commitment", "open_loop"}
 DIAGNOSIS = re.compile(r"人格障碍|回避型|依恋型|玻璃心|控制欲|MBTI|自卑型|讨好型|天生冷漠|真实动机|本质上")
 THIRD_PERSON = re.compile(r"^(?:我(?:的)?(?:室友|朋友|同学)|他朋友|她朋友|有人)(?:说|表示|觉得|喜欢|讨厌)")
 OWN_TURN = re.compile(r"(?:但|但是|不过|而|至于)我(?:自己|本人|需要|希望|更|只|想|没有|不|则)")
-CHANGE = re.compile(r"改到|改成|改为|现在|不再|之前.*(?:现在|以后)|最后定|最终|说错|没采用|取消|结束|交完|收到.*录用")
-CORRECTION = re.compile(r"刚才.*说错|更正|不是.*是|最后定|最终|那条.*没采用")
+CHANGE = re.compile(r"改到|改成|改为|现在|不再|之前.*(?:现在|以后)|最后定|最终|说错|打错|更正|没采用|取消|结束|交完|发完|发出|收到|完成|通过")
+CORRECTION = re.compile(r"刚才.*说错|更正|说错|打错|不是.*是|最后定|最终|那条.*没采用")
 GENERIC = {"多沟通", "互相理解", "尊重对方", "注意沟通方式", "多关心对方"}
 
 
@@ -60,6 +65,12 @@ def validate_items(raw, messages, *, semantic_checked=False, precheck=False):
     by_id = {m["id"]: m for m in messages}
     accepted, rejected = [], []
     for item in raw:
+        if (isinstance(item, dict) and item.get("memory_type") in
+                {"special_date", "useful_preference", "personal_view", "personal_goal", "shared_experience", "commitment", "open_loop", "event"}
+                and (item.get("scope") is None or isinstance(item.get("scope"), str) and not item["scope"].strip())):
+            # An unconditional birthday/interest need not invent a situation just
+            # to satisfy the schema. This is an explicit absence-of-scope label.
+            item = {**item, "scope": "仅限这条本人表达，未说明其他适用条件"}
         if isinstance(item,dict) and item.get("subject")=="both":
             item={**item,"subject":"relation"}  # Semantic alias; still requires both speakers below.
         if isinstance(item,dict) and isinstance(item.get("evidence"),list) and any(
@@ -92,6 +103,12 @@ def validate_items(raw, messages, *, semantic_checked=False, precheck=False):
             rejected.append("引用旧消息不能作为本次独立发言依据")
             continue
         expected_role = c["subject"] if c["subject"] != "relation" else None
+        own_sources = [by_id[i] for i in ids if by_id[i]["role"] == expected_role]
+        if c["memory_type"] in {"situated_trait", "relationship_position", "special_date"} and own_sources and all(
+                m.get("kind") in {"image", "sticker", "emoji", "image_description"}
+                or re.match(r"[【\[](?:图片|表情).*(?:描述|概述|：|:)", m["content"]) for m in own_sources):
+            rejected.append("图片或表情注释不能独立证明本人性格、关系态度或日期")
+            continue
         if not precheck and expected_role and expected_role not in roles:
             rejected.append("人物归属与引用不一致")
             continue
@@ -99,8 +116,9 @@ def validate_items(raw, messages, *, semantic_checked=False, precheck=False):
                 or c["memory_type"] in {"shared_understanding", "interaction_signal"}) and roles != {"self", "other"}:
             rejected.append("互动结论缺少双方依据")
             continue
-        if (not precheck and c["memory_type"] == "interaction_signal"
-                and re.search(r"约定|答应|同意|达成|接受.*邀|确定.*见面", c["fact"])
+        if (not precheck and (c["memory_type"] == "interaction_signal"
+                             or (c["memory_type"] in TIMED_TYPES and (c["subject"] == "relation" or re.search("双方|约定", c["fact"]))))
+                and (re.search(r"约定|答应|同意|达成|接受.*邀|确定.*见面", c["fact"]) or c.get("item_state") == "agreed")
                 and not re.search(r"没有.{0,4}(?:约定|答应|同意)|未.{0,4}(?:约定|答应|同意|达成|接受)|只是提议", c["fact"])):
             first_role = by_id[min(ids)]["role"]
             replies = [e["quote"] for e in c["evidence"] if by_id[e["message_id"]]["role"] != first_role
@@ -110,6 +128,16 @@ def validate_items(raw, messages, *, semantic_checked=False, precheck=False):
                 rejected.append("双方约定缺少明确接受的回应，不能把提议写成达成")
                 continue
         relevant = [e["quote"] for e in c["evidence"] if by_id[e["message_id"]]["role"] == c["subject"]]
+        if c["memory_type"] == "open_loop" and c["source_level"] == "interaction" and roles == {"self", "other"}:
+            c["subject"] = "relation"  # proposal + response is one shared unresolved matter, not two owners
+        if c["memory_type"] == "commitment" and c["item_state"] in {"unknown", "proposed", "pending"}:
+            own = " ".join(relevant)
+            if re.search(r"我(?:明确)?(?:答应|承诺|负责)", own) and not re.search(r"没(?:有)?答应|不负责|如果|假如|假设", own):
+                c["item_state"] = "agreed"
+        if c["memory_type"] in TIMED_TYPES and c["item_state"] in {"completed", "cancelled"} and normalized_status(c) != c["item_state"]:
+            c["item_state"] = "unknown"
+        if c["memory_type"] in {"commitment", "open_loop"} and c["item_state"] == "unknown" and normalized_status(c) in {"completed", "cancelled"}:
+            c["item_state"] = normalized_status(c)
         if relevant and all(THIRD_PERSON.search(q.strip()) and not OWN_TURN.search(q) for q in relevant):
             rejected.append("只有第三人转述，不能给本人建事实")
             continue
@@ -181,7 +209,7 @@ def existing_context(profile, limit=60):
         if f.get("memory_version") != 3:
             continue
         row = {k: f.get(k) for k in ("id", "memory_type", "subject", "scene", "topic", "context", "retention", "origin",
-                                   "observed_on", "event_date", "event_identity", "manual_locked", "validity")}
+                                   "observed_on", "event_date", "event_identity", "item_state", "manual_locked", "validity")}
         if not f.get("manual_locked"):
             row["fact"] = f["text"]
             row["interpretation"] = f.get("interpretation", "")
@@ -205,7 +233,15 @@ def extract_local(messages):
         if len(text) > 200 or SENSITIVE.search(text) or THIRD_PERSON.search(text) or any(q in text for q in ["“", "”", '"']):
             continue
         kind, topic, scope, retention, method = None, None, None, "conditional", ""
-        if m["role"] == "other" and re.search(r"(?:哪部分|哪一部分|做什么|任务|时间地点|具体).*(?:几点|截止|时间|地点)|时间.*地点", text) and re.search(r"告诉|说清|写清|发|请|能不能|分工|希望", text):
+        if re.search(r"(?:我的?生日|我\d{1,2}月\d{1,2}[日号]?生日|生日是\d{1,2}月)", text) and not re.search(r"如果|假如|假设|比如|朋友|室友|同学的", text):
+            kind, topic, scope = "special_date", "生日", "本人明确提到的生日；未说明字段留空"
+        elif re.match(r"我(?:最|特别|一直|更)?喜欢[^你我他她]", text) and not re.search(r"如果|假如|假设", text):
+            kind, topic, scope = "useful_preference", text[:32], "本人所述的具体喜好"
+        elif re.match(r"我", text) and re.search(r"刚认识.*(?:话少|慢热)|熟(?:了|悉).*话(?:多|多些)|拿不准.*(?:多问|确认)", text):
+            kind, topic, scope = "situated_trait", "本人描述的表达方式", "仅限原话所述的熟悉程度或情境"
+        elif re.match(r"我(?:答应|负责|会在)", text) and not re.search(r"如果|假如|不负责|没答应", text):
+            kind, topic, scope, retention = "commitment", text[:32], "原话所述的个人承诺", "temporary"
+        elif m["role"] == "other" and re.search(r"(?:哪部分|哪一部分|做什么|任务|时间地点|具体).*(?:几点|截止|时间|地点)|时间.*地点", text) and re.search(r"告诉|说清|写清|发|请|能不能|分工|希望", text):
             kind, topic, scope = "communication_request", "任务与安排说明", "任务分工或安排"
             method = "说明需要哪部分、什么时间或地点，再确认是否方便"
         elif re.search(r"别|不要|不希望|不喜欢", text) and "群" in text and "开玩笑" in text:
@@ -277,8 +313,16 @@ def source_date(c, chat_date, target=None):
 
 
 def normalized_status(c):
-    text = " ".join(e["quote"] for e in c["evidence"])
+    text = " ".join(e["quote"] for e in c.get("evidence", []))
     status = c["event_status"]
+    if c["memory_type"] in {"commitment", "open_loop"}:
+        proposed = c.get("item_state", "unknown")
+        if proposed not in {"completed", "cancelled"}:
+            proposed = status
+        if proposed == "completed" and re.search(r"收到|完成|发完|交完|解决|通过|过了", text) and not re.search(r"没(?:有)?(?:收到|完成|通过)|还没|如果", text):
+            return "completed"
+        if proposed == "cancelled" and re.search(r"取消|不用.*了|不去了", text):
+            return "cancelled"
     if status == "cancelled" and not re.search(r"取消|不去了",text):
         return "unknown"
     if status == "completed" and not re.search(r"结束|完成|面试完|考完",text):
@@ -298,10 +342,10 @@ def select_target(p, c):
         matches = [f for f in p["facts"] if f.get("memory_version") == 3
                    and f["memory_type"] == c["memory_type"] and f["subject"] == c["subject"]
                    and normalize(f["topic"]) == normalize(c["topic"])]
-        if c["memory_type"] == "event":
+        if c["memory_type"] in TIMED_TYPES:
             matches = [f for f in matches if c["event_identity"] and normalize(f.get("event_identity", "")) == normalize(c["event_identity"])]
         target = matches[0] if len(matches)==1 else None
-    if target and c["memory_type"] == "event":
+    if target and c["memory_type"] in TIMED_TYPES:
         if not c["event_identity"] or normalize(target.get("event_identity", "")) != normalize(c["event_identity"]):
             target = None
     return target
@@ -319,6 +363,7 @@ def new_fact(store, c, observed_on):
             "claim_basis":c.get("claim_basis","stated"),"alternative":c.get("alternative",""),
             "verification_reason":c.get("verification_reason",""),
             "event_date":None,"date_text":"","event_status":normalized_status(c),
+            "item_state":c.get("item_state", "unknown"),
             "origin":"ai","certainty":"stated" if c["source_level"]=="direct" and c.get("claim_basis","stated")=="stated" else "tentative",
             "status":"unreviewed","validity":"needs_confirmation" if c["retention"]=="pending" else "current",
             "manual_locked":False,"use_in_ai":True,"observed_on":observed_on,"first_seen":now(),"last_seen":now(),
@@ -326,7 +371,7 @@ def new_fact(store, c, observed_on):
 
 
 def snapshot(f):
-    return {k:copy.deepcopy(f.get(k)) for k in ("text","context","scene","observed_on","event_date","event_status","retention","method","example","branches","interpretation","limitation","claim_basis","alternative")}
+    return {k:copy.deepcopy(f.get(k)) for k in ("text","context","scene","observed_on","event_date","event_status","item_state","retention","method","example","branches","interpretation","limitation","claim_basis","alternative")}
 
 
 def metadata_for(store, profile, messages, chat_date, scene, origin):
@@ -408,7 +453,9 @@ def plan(store, profile, messages, candidates, chat_date=None, scene="", origin=
                 newer = bool(chat_date and target.get("observed_on") and chat_date > target["observed_on"])
                 quoted = " ".join(e["quote"] for e in c["evidence"])
                 within = target.get("_last_message_id",-1) < c["last_message_id"] and target.get("_current_batch")
-                if (newer and CHANGE.search(quoted)) or (within and CORRECTION.search(quoted)):
+                explicit_date_correction = (c["memory_type"] == "special_date" and CORRECTION.search(quoted)
+                                            and chat_date and target.get("observed_on") and chat_date >= target["observed_on"])
+                if (newer and CHANGE.search(quoted)) or (within and CORRECTION.search(quoted)) or explicit_date_correction:
                     action,reason = c["operation"],"明确变化或片段内自我纠正，保留旧版本"
                 else:
                     action,reason = "conflict","时间或变化依据不足，不按上传顺序覆盖"
@@ -430,15 +477,22 @@ def plan(store, profile, messages, candidates, chat_date=None, scene="", origin=
                 action,reason="branch","保留公开场景边界，同时增加私下条件"
             if target.get("origin")=="local" and origin=="ai" and not target["manual_locked"]:
                 action,reason="refine","同一原始资料改用AI完善理解，不增加原文次数"
-        edate, date_text = source_date(c,chat_date,target) if c["memory_type"]=="event" else (None,"")
-        if c["memory_type"]=="event" and not adding and not date_text:
+        edate, date_text = source_date(c,chat_date,target) if c["memory_type"] in TIMED_TYPES else (None,"")
+        if c["memory_type"] in TIMED_TYPES and not adding and not date_text:
             edate=target.get("event_date")
             date_text=target.get("date_text","")
         if action=="end" and normalized_status(c) not in {"completed","cancelled"}:
             action,reason="conflict","结束状态没有明确支持，先保留未知"
-        if not adding and c["memory_type"]=="event" and target.get("event_date") and edate and edate!=target["event_date"] and action=="evidence":
+        if not adding and not target["manual_locked"] and c["memory_type"] == "special_date" and action == "evidence":
+            old_dates = set(re.findall(r"(\d{1,2})月(\d{1,2})[日号]?", target["text"]))
+            new_dates = set(re.findall(r"(\d{1,2})月(\d{1,2})[日号]?", c["fact"]))
+            old_lunar, new_lunar = bool(re.search("农历|阴历", target["text"])), bool(re.search("农历|阴历", c["fact"]))
+            old_solar, new_solar = bool(re.search("公历|阳历", target["text"])), bool(re.search("公历|阳历", c["fact"]))
+            if (len(old_dates) == len(new_dates) == 1 and old_dates != new_dates) or (old_lunar and new_solar) or (old_solar and new_lunar):
+                action, reason = "conflict", "特殊日期不同且未明确纠正，请核对后采用"
+        if not adding and c["memory_type"] in TIMED_TYPES and target.get("event_date") and edate and edate!=target["event_date"] and action=="evidence":
             action,reason = "conflict","同一事件日期不同，但无可靠变化依据"
-        if c["memory_type"]=="event" and c["operation"]=="end" and normalized_status(c) in {"completed","cancelled"} and adding:
+        if c["memory_type"] in TIMED_TYPES and c["operation"]=="end" and normalized_status(c) in {"completed","cancelled"} and adding:
             action = "end"
         if (not adding and not target["manual_locked"] and c.get("review_required")
                 and c["memory_type"] in {"relationship_position","boundary","situated_trait"}
@@ -469,8 +523,9 @@ def plan(store, profile, messages, candidates, chat_date=None, scene="", origin=
                 target["versions"].append({**before,"reason":action,"validity":"superseded","at":now()})
             for k,field in (("text","fact"),("context","scope"),("retention","retention"),
                             ("interpretation","interpretation"),("method","method"),("example","example"),("limitation","limitation"),
-                            ("claim_basis","claim_basis"),("alternative","alternative"),("verification_reason","verification_reason")):
-                target[k]=c[field]
+                            ("claim_basis","claim_basis"),("alternative","alternative"),("verification_reason","verification_reason"),
+                            ("item_state","item_state")):
+                target[k]=c.get(field, "unknown" if field == "item_state" else "")
             target.update(observed_on=chat_date,status="unreviewed",source_level=c["source_level"],scene=c.get("scene","everyday"))
             target["certainty"] = "stated" if c["source_level"]=="direct" and c.get("claim_basis","stated")=="stated" else "tentative"
             if action in {"change","end"}:
@@ -478,9 +533,9 @@ def plan(store, profile, messages, candidates, chat_date=None, scene="", origin=
                 for old in target["evidence"]:
                     old["historical"] = True
             target["origin"]=origin
-            if c["memory_type"]=="event":
+            if c["memory_type"] in TIMED_TYPES:
                 target.update(event_date=edate,event_status=normalized_status(c),date_text=date_text)
-        if adding and c["memory_type"]=="event":
+        if adding and c["memory_type"] in TIMED_TYPES:
             target.update(event_date=edate,date_text=date_text)
         if action == "branch":
             branch = {"scope":c["scope"],"fact":c["fact"],"method":c["method"],"example":c["example"],
@@ -494,6 +549,7 @@ def plan(store, profile, messages, candidates, chat_date=None, scene="", origin=
                 "interpretation":c["interpretation"],"claim_basis":c.get("claim_basis","stated"),
                 "alternative":c.get("alternative",""),"verification_reason":c.get("verification_reason",""),
                 "source_level":c["source_level"],"event_status":normalized_status(c),
+                "item_state":c.get("item_state", "unknown"),
                 "evidence_keys":[e["key"] for e in evidence]})
             target.update(conflict=True,validity="needs_confirmation")
         elif action in {"change","refine"}:
@@ -579,11 +635,24 @@ def resolve(store, contact_id, fact_id, revision, decision):
         if not f or not f.get("conflict") or not f.get("alternatives") or f.get("manual_locked"):
             raise ValueError("这条记录没有可确认的变更")
         incoming = f["alternatives"][-1]
+        linked = next((r for r in p["facts"] if r["id"] == incoming.get("linked_fact_id")), None)
+        if linked:
+            if linked.get("manual_locked") or linked.get("continuity_pending_from") != f["id"]:
+                raise ValueError("关联记录已变化，请重新核对")
+            if decision not in {"accept", "keep"}:
+                raise ValueError("确认选项无效")
+            kept, historical = (linked, f) if decision == "accept" else (f, linked)
+            kept.update(conflict=False, validity="current", alternatives=[])
+            historical.update(conflict=False, validity="superseded", alternatives=[], superseded_by=kept["id"])
+            linked.pop("continuity_pending_from", None)
+            kept.setdefault("versions", []).append({**snapshot(historical), "source_fact_id":historical["id"],
+                "reason":"confirmed_archive_change" if decision == "accept" else "confirmed_archive_keep", "validity":"superseded", "at":now()})
+            return save(store, db, p)
         keys = set(incoming.get("evidence_keys", []))
         if decision == "accept":
             f["versions"].append({**snapshot(f), "reason": "confirmed_change", "at": now(), "validity": "superseded"})
             for key in ("text", "context", "event_date", "observed_on", "retention", "method", "example", "limitation",
-                        "interpretation", "claim_basis", "alternative", "verification_reason", "source_level", "event_status"):
+                        "interpretation", "claim_basis", "alternative", "verification_reason", "source_level", "event_status", "item_state"):
                 if key in incoming:
                     f[key] = incoming[key]
             f["branches"] = []

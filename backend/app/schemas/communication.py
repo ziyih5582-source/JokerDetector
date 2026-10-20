@@ -9,7 +9,8 @@ from app.schemas.profiles import Message
 
 MemoryType = Literal["communication_request", "boundary", "support_need", "situated_trait",
                      "shared_understanding", "stage_context", "event", "useful_preference",
-                     "relationship_position", "interaction_signal", "personal_view", "emotional_state"]
+                     "relationship_position", "interaction_signal", "personal_view", "emotional_state",
+                     "special_date", "commitment", "open_loop", "personal_goal", "shared_experience"]
 
 
 class Evidence(StrictModel):
@@ -38,6 +39,7 @@ class Candidate(StrictModel):
     operation: Literal["add", "evidence", "refine", "branch", "change", "conflict", "end"] = "add"
     event_identity: str = Field(default="", max_length=100)
     event_status: Literal["unknown", "planned", "completed", "cancelled", "result_unknown", "offer_received"] = "unknown"
+    item_state: Literal["unknown", "proposed", "pending", "agreed", "completed", "cancelled", "result_unknown"] = "unknown"
     evidence: list[Evidence] = Field(min_length=1, max_length=6)
 
 
@@ -70,3 +72,14 @@ class MemoryNote(StrictModel):
 class MemoryResolution(StrictModel):
     revision: int = Field(ge=0)
     decision: Literal["accept", "keep"]
+
+
+class ArchiveRebuild(StrictModel):
+    revision: int = Field(ge=0)
+    cloud_consent: bool = False
+    save_consent: bool = False
+
+
+class ArchiveDismiss(StrictModel):
+    revision: int = Field(ge=0)
+    trait_id: str = Field(min_length=1, max_length=64)

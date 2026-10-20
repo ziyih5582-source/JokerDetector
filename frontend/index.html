@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#f4f0e6">
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/css/ink.css?v=community-1.7">
-<link rel="stylesheet" href="/static/css/dossier.css?v=archive-focus-6.2">
+<link rel="stylesheet" href="/static/css/dossier.css?v=archive-v8.3">
 <link rel="stylesheet" href="/static/css/community.css?v=community-1.7">
 <link rel="stylesheet" href="/static/css/clown-board.css?v=joker-board-1.0">
 </head>
@@ -583,7 +583,7 @@
                 <label class="dossier-check"><input id="dossier-ai" type="checkbox">让 AI 理解完整互动（使用已配置的服务）</label>
                 <p class="note">AI 会提取后核查；长聊天会分段，可能产生多次请求。</p>
                 <label class="dossier-check"><input id="memory-consent" type="checkbox"><span id="memory-consent-text">我已核对双方，并同意保存本次有用信息与脱敏依据</span></label>
-                <div class="line-actions"><button type="button" class="line-btn" id="memory-run">理解聊天并更新档案</button><button type="button" class="line-btn quiet" id="dossier-redact">看一下脱敏内容</button></div>
+                <div class="line-actions"><button type="button" class="line-btn" id="memory-run">理解聊天并更新档案</button><button type="button" class="line-btn quiet" id="dossier-redact">看一下脱敏内容</button><button type="button" class="line-btn quiet" id="archive-rebuild">只整理已有资料</button></div>
                 <pre id="dossier-redacted" class="dossier-redacted" hidden></pre>
                 <div id="memory-update"></div>
               </details>
@@ -686,7 +686,7 @@
         </div>
         <div class="panel">
           <h4>② 记下来 · 人物档案</h4>
-          <p>关系里的失望常常来自「记错了」。档案按人保存对方明确说过的喜好与可核查的观察，正反冲突并存，随时可修正——它帮你看清这段关系，而不是替对方画像。</p>
+          <p>档案从双方的语言与互动中形成可修正的性格与相处画像，并合并值得记住的信息和后续建议。推断保留情境、依据和其他解释，可以查看原文、纠错或删除。</p>
         </div>
         <div class="panel">
           <h4>③ 说出口 · 找钓翁聊聊</h4>
@@ -746,7 +746,7 @@
       <div class="panels">
         <div class="panel">
           <h4>只在本机</h4>
-          <p>Excel 解析、统计与打分、手机号/邮箱等基础脱敏、喜好提取、档案加密存储（<code>data/private/</code>）。完整聊天内容不会进入档案库，也不写进数据库。</p>
+          <p>Excel 解析、统计与打分、手机号/邮箱等基础脱敏与档案加密存储在本机完成。档案保存有用要点和必要的脱敏互动片段，帮助后续核对与修正；这些片段仍可能含隐私，请在导入前校对。</p>
         </div>
         <div class="panel">
           <h4>勾选后才走网络</h4>
@@ -947,7 +947,7 @@
 <script src="/static/js/pond.js"></script>
 <script src="/static/js/clown.js?v=community-1.7"></script>
 <script src="/static/js/speech.js"></script>
-<script src="/static/js/dossier.js?v=archive-focus-6.2"></script>
+<script src="/static/js/dossier.js?v=archive-v8.3"></script>
 <script src="/static/js/ink.js?v=community-1.7"></script>
 <script src="/static/js/community.js?v=community-1.7"></script>
 <script src="/static/js/clown-board.js?v=joker-board-1.0"></script>
